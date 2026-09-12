@@ -7,6 +7,7 @@ app.use(cors({
     origin: '*',
 })); // to resolve cors issue
 
+app.use(express.json()); // to use json data
 app.get('/', (req, res) => {
   res.send('Hello World')
 });
