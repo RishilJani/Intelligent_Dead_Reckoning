@@ -913,7 +913,8 @@ export function getMapHtml(): string {
         summary: res.engineMode,
         engineMode: res.engineMode,
         startPoint: startPoint,
-        endPoint: endPoint
+        endPoint: endPoint,
+        coords: res.coords
       });
     }
 
@@ -980,8 +981,48 @@ export function getMapHtml(): string {
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     }
 
+    function projectPointToRoute(lat, lon, routeCoords) {
+      if (!routeCoords || routeCoords.length < 2) return { lat: lat, lon: lon };
+      let minDistance = Infinity;
+      let snappedPt = { lat: lat, lon: lon };
+
+      for (let i = 0; i < routeCoords.length - 1; i++) {
+        const p1 = routeCoords[i];
+        const p2 = routeCoords[i + 1];
+
+        const dx = p2[1] - p1[1];
+        const dy = p2[0] - p1[0];
+        const lenSq = dx * dx + dy * dy;
+
+        let projLat = p1[0];
+        let projLon = p1[1];
+
+        if (lenSq > 1e-12) {
+          const t = Math.max(0, Math.min(1, ((lat - p1[0]) * dy + (lon - p1[1]) * dx) / lenSq));
+          projLat = p1[0] + t * dy;
+          projLon = p1[1] + t * dx;
+        }
+
+        const d = Math.hypot(lat - projLat, lon - projLon);
+        if (d < minDistance) {
+          minDistance = d;
+          snappedPt = { lat: projLat, lon: projLon };
+        }
+      }
+      return snappedPt;
+    }
+
     function updateRealNavLocation(lat, lon, accuracy, heading, speedKmh) {
-      lastNavCoords = [lat, lon];
+      // Snap marker strictly onto the route path if active route exists
+      let displayLat = lat;
+      let displayLon = lon;
+      if (currentRouteCoords && currentRouteCoords.length > 1) {
+        const snapped = projectPointToRoute(lat, lon, currentRouteCoords);
+        displayLat = snapped.lat;
+        displayLon = snapped.lon;
+      }
+
+      lastNavCoords = [displayLat, displayLon];
       
       if (heading != null && heading !== 0) {
         lastNavHeading = heading;
@@ -990,19 +1031,19 @@ export function getMapHtml(): string {
       if (!isRealNavigating) return;
 
       if (!vehicleMarker) {
-        vehicleMarker = L.marker([lat, lon], { icon: createVehicleIcon(lastNavHeading), zIndexOffset: 1000 }).addTo(map);
+        vehicleMarker = L.marker([displayLat, displayLon], { icon: createVehicleIcon(lastNavHeading), zIndexOffset: 1000 }).addTo(map);
       } else {
-        vehicleMarker.setLatLng([lat, lon]);
+        vehicleMarker.setLatLng([displayLat, displayLon]);
         vehicleMarker.setIcon(createVehicleIcon(lastNavHeading));
       }
 
-      map.panTo([lat, lon], { animate: true, duration: 0.35 });
+      map.panTo([displayLat, displayLon], { animate: true, duration: 0.35 });
 
       const currentSpeed = speedKmh != null ? Math.round(speedKmh) : 0;
       document.getElementById('speed-display').innerText = currentSpeed;
 
       if (endPoint) {
-        const distToEnd = getDistanceFromLatLonInKm(lat, lon, endPoint.lat, endPoint.lon);
+        const distToEnd = getDistanceFromLatLonInKm(displayLat, displayLon, endPoint.lat, endPoint.lon);
         
         if (distToEnd < 0.030) {
           speakText('You have arrived at your destination.');
@@ -1011,7 +1052,7 @@ export function getMapHtml(): string {
           return;
         }
 
-        const remainingKm = calculateRemainingDistance(lat, lon);
+        const remainingKm = calculateRemainingDistance(displayLat, displayLon);
         const estSpeed = Math.max(15, currentSpeed || 30);
         const remainingMins = Math.max(1, Math.round((remainingKm / estSpeed) * 60));
 

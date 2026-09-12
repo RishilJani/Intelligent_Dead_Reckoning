@@ -180,10 +180,10 @@ export default function NavigationScreen() {
             setRouteStats((prev) =>
               prev
                 ? {
-                    ...prev,
-                    distanceKm: Number(data.remainingDistanceKm),
-                    durationMins: Number(data.remainingMins),
-                  }
+                  ...prev,
+                  distanceKm: Number(data.remainingDistanceKm),
+                  durationMins: Number(data.remainingMins),
+                }
                 : null
             );
           }

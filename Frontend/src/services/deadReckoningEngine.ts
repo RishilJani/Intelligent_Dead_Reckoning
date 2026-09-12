@@ -39,6 +39,8 @@ export class DeadReckoningEngine {
   };
 
   private activeRouteCoords: [number, number][] = [];
+  private routeSegmentIndex = 0;
+  private routeSegmentProgressMeters = 0;
   private onStateUpdateCallbacks: ((state: DeadReckoningState) => void)[] = [];
 
   // Model prediction 2.0s interval control
@@ -117,6 +119,136 @@ export class DeadReckoningEngine {
 
   public setActiveRoute(coords: [number, number][]) {
     this.activeRouteCoords = coords;
+    this.syncRouteProgress(this.currentState.lat, this.currentState.lon);
+  }
+
+  /**
+   * Calculate distance between two lat/lon coordinates in meters.
+   */
+  private getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371000; // Earth radius in meters
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  /**
+   * Calculate initial bearing from point 1 to point 2 in degrees (0 - 360).
+   */
+  private getBearingDegrees(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const phi1 = (lat1 * Math.PI) / 180;
+    const phi2 = (lat2 * Math.PI) / 180;
+    const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+    const y = Math.sin(deltaLambda) * Math.cos(phi2);
+    const x =
+      Math.cos(phi1) * Math.sin(phi2) -
+      Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+    const theta = Math.atan2(y, x);
+    return ((theta * 180) / Math.PI + 360) % 360;
+  }
+
+  /**
+   * Project a coordinate onto the active route polyline and synchronize segment index and progress.
+   */
+  private syncRouteProgress(lat: number, lon: number) {
+    if (!this.activeRouteCoords || this.activeRouteCoords.length < 2) {
+      this.routeSegmentIndex = 0;
+      this.routeSegmentProgressMeters = 0;
+      return;
+    }
+
+    let minDistance = Infinity;
+    let bestSegmentIndex = 0;
+    let bestProgressMeters = 0;
+
+    for (let i = 0; i < this.activeRouteCoords.length - 1; i++) {
+      const p1 = this.activeRouteCoords[i];
+      const p2 = this.activeRouteCoords[i + 1];
+
+      const segLenMeters = this.getDistanceMeters(p1[0], p1[1], p2[0], p2[1]);
+      if (segLenMeters <= 0.1) continue;
+
+      const dy = p2[0] - p1[0];
+      const dx = p2[1] - p1[1];
+      const lenSq = dx * dx + dy * dy;
+
+      let t = 0;
+      if (lenSq > 1e-12) {
+        t = Math.max(0, Math.min(1, ((lat - p1[0]) * dy + (lon - p1[1]) * dx) / lenSq));
+      }
+
+      const projLat = p1[0] + t * dy;
+      const projLon = p1[1] + t * dx;
+      const dist = this.getDistanceMeters(lat, lon, projLat, projLon);
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestSegmentIndex = i;
+        bestProgressMeters = t * segLenMeters;
+      }
+    }
+
+    this.routeSegmentIndex = bestSegmentIndex;
+    this.routeSegmentProgressMeters = bestProgressMeters;
+  }
+
+  /**
+   * Advance the user position strictly along the navigation path by deltaMeters.
+   */
+  private advanceAlongRoute(deltaMeters: number): { lat: number; lon: number; heading: number } {
+    if (!this.activeRouteCoords || this.activeRouteCoords.length < 2) {
+      return {
+        lat: this.currentState.lat,
+        lon: this.currentState.lon,
+        heading: this.currentState.heading,
+      };
+    }
+
+    let remainingDist = deltaMeters;
+
+    while (this.routeSegmentIndex < this.activeRouteCoords.length - 1 && remainingDist > 0) {
+      const p1 = this.activeRouteCoords[this.routeSegmentIndex];
+      const p2 = this.activeRouteCoords[this.routeSegmentIndex + 1];
+      const segLenMeters = this.getDistanceMeters(p1[0], p1[1], p2[0], p2[1]);
+
+      const distLeftInSegment = segLenMeters - this.routeSegmentProgressMeters;
+
+      if (remainingDist < distLeftInSegment) {
+        this.routeSegmentProgressMeters += remainingDist;
+        remainingDist = 0;
+        break;
+      } else {
+        remainingDist -= distLeftInSegment;
+        if (this.routeSegmentIndex < this.activeRouteCoords.length - 2) {
+          this.routeSegmentIndex++;
+          this.routeSegmentProgressMeters = 0;
+        } else {
+          // Reached the final destination vertex of the route
+          this.routeSegmentIndex = this.activeRouteCoords.length - 2;
+          this.routeSegmentProgressMeters = segLenMeters;
+          remainingDist = 0;
+          break;
+        }
+      }
+    }
+
+    const currP1 = this.activeRouteCoords[this.routeSegmentIndex];
+    const currP2 = this.activeRouteCoords[this.routeSegmentIndex + 1];
+    const currSegLen = Math.max(0.1, this.getDistanceMeters(currP1[0], currP1[1], currP2[0], currP2[1]));
+    const ratio = Math.max(0, Math.min(1, this.routeSegmentProgressMeters / currSegLen));
+
+    const interpLat = currP1[0] + ratio * (currP2[0] - currP1[0]);
+    const interpLon = currP1[1] + ratio * (currP2[1] - currP1[1]);
+    const segmentBearing = this.getBearingDegrees(currP1[0], currP1[1], currP2[0], currP2[1]);
+
+    return { lat: interpLat, lon: interpLon, heading: segmentBearing };
   }
 
   /**
@@ -135,6 +267,11 @@ export class DeadReckoningEngine {
     }
 
     this.lastGpsCoords = { lat, lon, heading, speedKmh: cleanSpeed };
+
+    // Synchronize route progress while GPS is available
+    if (this.activeRouteCoords.length > 1) {
+      this.syncRouteProgress(lat, lon);
+    }
 
     // When offline mode is enabled, ignore GPS position
     if (this.isOfflineMode) {
@@ -156,7 +293,7 @@ export class DeadReckoningEngine {
   /**
    * 10Hz Step:
    *  - When GPS is ONLINE: navigation location is driven purely by GPS signal.
-   *  - When GPS is OFFLINE: (only then) location is predicted by the on-device ONNX model.
+   *  - When GPS is OFFLINE: location advances strictly along the navigation direction path!
    */
   private step(windowData: number[][]) {
     if (!this.isNavigating) return;
@@ -217,39 +354,40 @@ export class DeadReckoningEngine {
         this.currentState.speedKmh = isStationary ? 0 : this.lastPredictedSpeedKmh;
         this.currentState.yawRateDps = isStationary ? 0 : this.lastPredictedYawRateDps;
 
-        // 1. Integrate yaw rate -> update heading smoothly at 10Hz
-        const dTheta = this.lastPredictedYawRateDps * dt;
-        this.currentState.heading = (this.currentState.heading + dTheta + 360) % 360;
-
-        // 2. Compute displacement from predicted speed
-        const speedMps = this.lastPredictedSpeedKmh / 3.6;
+        // Compute forward displacement from accurate speed model
+        const speedMps = this.currentState.speedKmh / 3.6;
         const distMeters = speedMps * dt;
 
-        const headingRad = (this.currentState.heading * Math.PI) / 180;
-        const dx = distMeters * Math.sin(headingRad); // East
-        const dy = distMeters * Math.cos(headingRad); // North
-
-        // Earth radius ≈ 6,371,000 m
-        const dLat = (dy / 6371000) * (180 / Math.PI);
-        const dLon =
-          (dx / (6371000 * Math.cos((this.currentState.lat * Math.PI) / 180))) *
-          (180 / Math.PI);
-
-        let nextLat = this.currentState.lat + dLat;
-        let nextLon = this.currentState.lon + dLon;
-
-        // 3. Snap to route polyline to reduce drift
-        if (this.activeRouteCoords.length > 1 && distMeters > 0.02) {
-          const snapped = this.snapToRoute(nextLat, nextLon);
-          if (snapped) {
-            nextLat = snapped.lat;
-            nextLon = snapped.lon;
+        if (this.activeRouteCoords.length > 1) {
+          // ── ROUTE-CONSTRAINED NAVIGATION PATH ──────────────────────
+          // User pointer stays strictly within navigation direction path!
+          // Speed model moves the pointer along the route segments, and pointer
+          // orientation is aligned to the segment tangent (immune to yaw model errors).
+          if (distMeters > 0.005) {
+            const nextPos = this.advanceAlongRoute(distMeters);
+            this.currentState.lat = nextPos.lat;
+            this.currentState.lon = nextPos.lon;
+            this.currentState.heading = nextPos.heading;
           }
+        } else {
+          // Fallback if no active route is loaded: unconstrained integration
+          const dTheta = this.lastPredictedYawRateDps * dt;
+          this.currentState.heading = (this.currentState.heading + dTheta + 360) % 360;
+
+          const headingRad = (this.currentState.heading * Math.PI) / 180;
+          const dx = distMeters * Math.sin(headingRad);
+          const dy = distMeters * Math.cos(headingRad);
+
+          const dLat = (dy / 6371000) * (180 / Math.PI);
+          const dLon =
+            (dx / (6371000 * Math.cos((this.currentState.lat * Math.PI) / 180))) *
+            (180 / Math.PI);
+
+          this.currentState.lat += dLat;
+          this.currentState.lon += dLon;
         }
 
-        this.currentState.lat = nextLat;
-        this.currentState.lon = nextLon;
-        this.currentState.accuracyMeters = 15;
+        this.currentState.accuracyMeters = 5;
 
         // Broadcast state (with 10Hz real-time sensor telemetry)
         this.broadcastState();
@@ -257,23 +395,6 @@ export class DeadReckoningEngine {
     } catch (e) {
       console.warn('Dead reckoning step error:', e);
     }
-  }
-
-  private snapToRoute(lat: number, lon: number): { lat: number; lon: number } | null {
-    if (this.activeRouteCoords.length < 2) return null;
-    let minD = Infinity;
-    let bestPt = null;
-
-    for (let i = 0; i < this.activeRouteCoords.length; i++) {
-      const pt = this.activeRouteCoords[i];
-      const d = Math.hypot(lat - pt[0], lon - pt[1]);
-      if (d < minD && d < 0.0006) {
-        // Within ~50 meters of route
-        minD = d;
-        bestPt = { lat: pt[0], lon: pt[1] };
-      }
-    }
-    return bestPt;
   }
 
   private broadcastState() {
