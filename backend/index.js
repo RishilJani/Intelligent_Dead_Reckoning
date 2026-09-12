@@ -17,6 +17,7 @@ app.get('/', (req, res) => {
 
 app.use("/users", require("./controllers/userController"));
 app.use("/feedbacks", verifyToken, require("./controllers/feedbackController"));
+app.use("/favourites", verifyToken, require("./controllers/favouriteController"));
 
 const PORT = process.env.PORT || 5000
 app.listen(PORT, () => {
