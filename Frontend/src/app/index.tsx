@@ -54,6 +54,10 @@ export default function NavigationScreen() {
   const [predictedYawRate, setPredictedYawRate] = useState<number>(0);
   const [gpsAvailable, setGpsAvailable] = useState<boolean>(true);
   const [sensorTelemetry, setSensorTelemetry] = useState<LiveSensorTelemetry | null>(null);
+  const [rawModelSpeedKmh, setRawModelSpeedKmh] = useState<number>(0);
+  const [confirmedSpeedKmh, setConfirmedSpeedKmh] = useState<number>(0);
+  const [modelConfidence, setModelConfidence] = useState<number>(100);
+  const [activeBarriers, setActiveBarriers] = useState<string[]>([]);
 
   // Live Location Tracker Hook with continuous GPS streaming
   const {
@@ -75,11 +79,11 @@ export default function NavigationScreen() {
         speedKmh: coords.speedKmh,
         setAsStart: true,
       });
-      deadReckoning.updateGpsPosition(coords.lat, coords.lon, coords.heading || 0, coords.speedKmh || 0);
+      deadReckoning.updateGpsPosition(coords.lat, coords.lon, coords.heading || 0, coords.speedKmh || 0, coords.accuracy || 8);
     }, [sendMapCommand, deadReckoning]),
     onLocationUpdate: useCallback((coords: LiveCoords) => {
       // Feed GPS reading into Dead Reckoning Engine
-      deadReckoning.updateGpsPosition(coords.lat, coords.lon, coords.heading || 0, coords.speedKmh || 0);
+      deadReckoning.updateGpsPosition(coords.lat, coords.lon, coords.heading || 0, coords.speedKmh || 0, coords.accuracy || 8);
 
       // Feed GPS vehicle dynamics to SensorPipeline
       SensorPipeline.getInstance().feedGpsKinematics(coords.speedKmh || 0, coords.heading || 0);
@@ -443,12 +447,16 @@ export default function NavigationScreen() {
         );
       }
 
-      // Start Dead Reckoning Engine (GPS online -> GPS; GPS offline -> ONNX model)
+      // Start Dead Reckoning Engine (GPS online -> GPS; GPS offline -> TF Speed Model + Barriers)
       deadReckoning.start((state: DeadReckoningState) => {
         setNavMode(state.mode);
         setCurrentSpeedKmh(Math.round(state.speedKmh));
         setPredictedYawRate(state.yawRateDps);
         setGpsAvailable(state.gpsAvailable);
+        if (state.rawModelSpeedKmh != null) setRawModelSpeedKmh(state.rawModelSpeedKmh);
+        if (state.confirmedSpeedKmh != null) setConfirmedSpeedKmh(state.confirmedSpeedKmh);
+        if (state.modelConfidence != null) setModelConfidence(state.modelConfidence);
+        if (state.activeBarriers) setActiveBarriers(state.activeBarriers);
         if (state.telemetry) {
           setSensorTelemetry(state.telemetry);
         }
@@ -471,12 +479,23 @@ export default function NavigationScreen() {
     } else {
       deadReckoning.stop();
       setSensorTelemetry(null);
+      setActiveBarriers([]);
+      setRawModelSpeedKmh(0);
+      setConfirmedSpeedKmh(0);
+      setModelConfidence(100);
       sendMapCommand('TOGGLE_REAL_NAVIGATION', {
         active: false,
       });
       setIsPreviewingDirections(false);
     }
   };
+
+  // Tunnel / GPS Blackout Simulation Toggle for HUD
+  const handleToggleTunnel = useCallback(() => {
+    const nextVal = deadReckoning.toggleTunnelMode();
+    setIsOfflineMode(nextVal);
+    sendMapCommand('SET_FORCE_OFFLINE', { offline: nextVal });
+  }, [deadReckoning, sendMapCommand]);
 
   // Cartography & Tile Settings
   const handleSelectLayer = (layer: MapTileLayerType) => {
@@ -556,7 +575,7 @@ export default function NavigationScreen() {
         </View>
       )}
 
-      {/* 7. Bottom Navigation & Route Summary Card with On-Device ONNX ML Dead Reckoning */}
+      {/* 7. Bottom Navigation & Route Summary Card with On-Device ML Dead Reckoning & Barrier HUD */}
       <NavigationCard
         routeStats={routeStats}
         activeCosting={activeCosting}
@@ -566,6 +585,12 @@ export default function NavigationScreen() {
         gpsAvailable={gpsAvailable}
         yawRateDps={predictedYawRate}
         telemetry={sensorTelemetry}
+        rawModelSpeedKmh={rawModelSpeedKmh}
+        confirmedSpeedKmh={confirmedSpeedKmh}
+        modelConfidence={modelConfidence}
+        activeBarriers={activeBarriers}
+        isTunnelMode={isOfflineMode}
+        onToggleTunnelMode={handleToggleTunnel}
         selectedPlace={selectedPlace}
         distanceToSelectedPlace={distanceToSelectedPlace}
         isPreviewingDirections={isPreviewingDirections}

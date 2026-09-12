@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import api from './api';
 
 export interface User {
+  id?: number | string;
+  user_id?: number | string;
   username: string;
   email: string;
 }
@@ -21,6 +23,39 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const STORAGE_KEY_USER = 'nav_current_user';
 const STORAGE_KEY_TOKEN = 'nav_jwt_token';
 
+function decodeBase64(input: string): string {
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).atob === 'function') {
+    return (globalThis as any).atob(input);
+  }
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  const str = input.replace(/=+$/, '');
+  let output = '';
+  let bs = 0;
+  let bc = 0;
+  for (let idx = 0; idx < str.length; idx++) {
+    const charIdx = chars.indexOf(str.charAt(idx));
+    if (charIdx === -1) continue;
+    bs = bc % 4 ? bs * 64 + charIdx : charIdx;
+    if (bc++ % 4) {
+      output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)));
+    }
+  }
+  return output;
+}
+
+function extractUserIdFromToken(token: string): number | string | undefined {
+  try {
+    const parts = token.split('.');
+    if (parts.length >= 2) {
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const jsonStr = decodeBase64(base64);
+      const payload = JSON.parse(jsonStr);
+      return payload.user_id || payload.id;
+    }
+  } catch (_e) { }
+  return undefined;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -32,12 +67,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== 'undefined' && window.localStorage) {
         const storedUser = window.localStorage.getItem(STORAGE_KEY_USER);
         const storedToken = window.localStorage.getItem(STORAGE_KEY_TOKEN);
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
-          setIsGuest(false);
-        }
         if (storedToken) {
           setToken(storedToken);
+          api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        }
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          if (storedToken && !parsedUser.user_id) {
+            parsedUser.user_id = extractUserIdFromToken(storedToken);
+          }
+          setUser(parsedUser);
+          setIsGuest(false);
         }
       }
     } catch (_e) {
@@ -76,15 +116,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (response.data && response.data.success) {
+        const authToken = response.data.token || null;
+        const resolvedUserId = response.data.data?.user_id || (authToken ? extractUserIdFromToken(authToken) : undefined);
         const newUser: User = {
+          id: resolvedUserId,
+          user_id: resolvedUserId,
           username: response.data.data?.user_name || trimmedUser,
           email: response.data.data?.email || trimmedEmail,
         };
-        const authToken = response.data.token || null;
 
         setUser(newUser);
         setToken(authToken);
         setIsGuest(false);
+
+        if (authToken) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+        }
 
         try {
           if (typeof window !== 'undefined' && window.localStorage) {
@@ -110,7 +157,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string
   ): Promise<{ success: boolean; error?: string }> => {
     const trimmedEmail = email.trim().toLowerCase();
-    console.log("Frontend login 1....");
 
     if (!trimmedEmail) {
       return { success: false, error: 'Please enter your email.' };
@@ -125,18 +171,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: trimmedEmail,
         password,
       });
-      console.log("Frontend login 2....");
+
       if (response.data && response.data.success) {
+        const authToken = response.data.token || null;
+        const resolvedUserId = response.data.data?.user_id || (authToken ? extractUserIdFromToken(authToken) : undefined);
         const loggedInUser: User = {
+          id: resolvedUserId,
+          user_id: resolvedUserId,
           username: response.data.data?.user_name || trimmedEmail.split('@')[0],
           email: response.data.data?.email || trimmedEmail,
         };
-        const authToken = response.data.token || null;
-        console.log("Frontend login 3....");
 
         setUser(loggedInUser);
         setToken(authToken);
         setIsGuest(false);
+
+        if (authToken) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+        }
 
         try {
           if (typeof window !== 'undefined' && window.localStorage) {
@@ -161,6 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setToken(null);
     setIsGuest(true);
+    delete api.defaults.headers.common['Authorization'];
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.removeItem(STORAGE_KEY_USER);

@@ -12,6 +12,12 @@ interface NavigationCardProps {
   gpsAvailable?: boolean;
   yawRateDps?: number;
   telemetry?: LiveSensorTelemetry | null;
+  rawModelSpeedKmh?: number;
+  confirmedSpeedKmh?: number;
+  modelConfidence?: number;
+  activeBarriers?: string[];
+  isTunnelMode?: boolean;
+  onToggleTunnelMode?: () => void;
   
   // Place Selection & Directions Preview
   selectedPlace?: LocationPoint | null;
@@ -46,6 +52,12 @@ export function NavigationCard({
   gpsAvailable = true,
   yawRateDps = 0,
   telemetry = null,
+  rawModelSpeedKmh = 0,
+  confirmedSpeedKmh = 0,
+  modelConfidence = 100,
+  activeBarriers = [],
+  isTunnelMode = false,
+  onToggleTunnelMode,
   selectedPlace,
   distanceToSelectedPlace,
   isPreviewingDirections = false,
@@ -330,23 +342,217 @@ export function NavigationCard({
               <View
                 style={[
                   styles.pulsingDot,
-                  { backgroundColor: navMode === 'TF_DEAD_RECKONING' ? '#a855f7' : '#10b981' },
+                  {
+                    backgroundColor: isTunnelMode
+                      ? '#f59e0b'
+                      : navMode === 'TF_DEAD_RECKONING'
+                      ? '#a855f7'
+                      : '#10b981',
+                  },
                 ]}
               />
+              <View>
+                <Text
+                  style={[
+                    styles.liveNavStatusText,
+                    {
+                      color: isTunnelMode
+                        ? '#f59e0b'
+                        : navMode === 'TF_DEAD_RECKONING'
+                        ? '#c084fc'
+                        : '#10b981',
+                    },
+                  ]}>
+                  {isTunnelMode
+                    ? '🚇 Tunnel Mode (GPS Blackout)'
+                    : navMode === 'TF_DEAD_RECKONING'
+                    ? '🤖 Neural Speed DR (Offline)'
+                    : '🛰️ Real GPS Connected'}
+                </Text>
+                {navMode === 'TF_DEAD_RECKONING' && (
+                  <Text style={{ fontSize: 9, color: isDark ? '#94a3b8' : '#64748b', marginTop: 1 }}>
+                    Raw Model: {rawModelSpeedKmh} km/h • 10Hz EMA Filtered
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            <View style={{ alignItems: 'flex-end', gap: 3 }}>
+              <View style={styles.speedPill}>
+                <Text style={styles.speedValText}>{currentSpeedKmh}</Text>
+                <Text style={styles.speedUnitText}>KM/H</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Dynamic Speed Progress Gauge Bar */}
+          <View style={styles.speedGaugeContainer}>
+            <View
+              style={[
+                styles.speedGaugeFill,
+                {
+                  width: `${Math.min(100, Math.max(3, (currentSpeedKmh / 120) * 100))}%`,
+                  backgroundColor: isTunnelMode
+                    ? '#f59e0b'
+                    : navMode === 'TF_DEAD_RECKONING'
+                    ? '#a855f7'
+                    : '#0ea5e9',
+                },
+              ]}
+            />
+          </View>
+
+          {/* Multi-Tiered Barrier Status Chips HUD */}
+          <View style={styles.barrierChipsRow}>
+            {/* 1. Spike / Twitch Guard */}
+            <View
+              style={[
+                styles.barrierChip,
+                {
+                  backgroundColor:
+                    activeBarriers.includes('SPIKE_GUARD') ||
+                    activeBarriers.includes('SPIKE_REJECTED') ||
+                    telemetry?.isTwitchSpikeSuppressed
+                      ? 'rgba(245, 158, 11, 0.18)'
+                      : isDark
+                      ? 'rgba(30, 41, 59, 0.6)'
+                      : '#f1f5f9',
+                  borderColor:
+                    activeBarriers.includes('SPIKE_GUARD') ||
+                    activeBarriers.includes('SPIKE_REJECTED') ||
+                    telemetry?.isTwitchSpikeSuppressed
+                      ? '#f59e0b'
+                      : 'transparent',
+                },
+              ]}>
               <Text
                 style={[
-                  styles.liveNavStatusText,
-                  { color: navMode === 'TF_DEAD_RECKONING' ? '#c084fc' : '#10b981' },
+                  styles.barrierChipText,
+                  {
+                    color:
+                      activeBarriers.includes('SPIKE_GUARD') ||
+                      activeBarriers.includes('SPIKE_REJECTED') ||
+                      telemetry?.isTwitchSpikeSuppressed
+                        ? '#f59e0b'
+                        : isDark
+                        ? '#94a3b8'
+                        : '#64748b',
+                  },
                 ]}>
-                {navMode === 'TF_DEAD_RECKONING' ? '🤖 Neural Dead Reckoning' : '🛰️ Real GPS Connected'}
+                🛡️{' '}
+                {activeBarriers.includes('SPIKE_GUARD') ||
+                activeBarriers.includes('SPIKE_REJECTED') ||
+                telemetry?.isTwitchSpikeSuppressed
+                  ? 'Spike Guard'
+                  : 'Spikes: OK'}
               </Text>
             </View>
 
-            <View style={styles.speedPill}>
-              <Text style={styles.speedValText}>{currentSpeedKmh}</Text>
-              <Text style={styles.speedUnitText}>KM/H</Text>
+            {/* 2. Kinematics G-Force Guard */}
+            <View
+              style={[
+                styles.barrierChip,
+                {
+                  backgroundColor: activeBarriers.includes('KINEMATIC_GUARD')
+                    ? 'rgba(168, 85, 247, 0.2)'
+                    : isDark
+                    ? 'rgba(30, 41, 59, 0.6)'
+                    : '#f1f5f9',
+                  borderColor: activeBarriers.includes('KINEMATIC_GUARD')
+                    ? '#a855f7'
+                    : 'transparent',
+                },
+              ]}>
+              <Text
+                style={[
+                  styles.barrierChipText,
+                  {
+                    color: activeBarriers.includes('KINEMATIC_GUARD')
+                      ? '#c084fc'
+                      : isDark
+                      ? '#94a3b8'
+                      : '#64748b',
+                  },
+                ]}>
+                ⚡ {activeBarriers.includes('KINEMATIC_GUARD') ? 'G-Clamped' : 'G-Force: OK'}
+              </Text>
+            </View>
+
+            {/* 3. ZUPT Rest Lock */}
+            <View
+              style={[
+                styles.barrierChip,
+                {
+                  backgroundColor:
+                    activeBarriers.includes('ZUPT_LOCKED') || activeBarriers.includes('CRAWL_SNAP')
+                      ? 'rgba(239, 68, 68, 0.18)'
+                      : isDark
+                      ? 'rgba(30, 41, 59, 0.6)'
+                      : '#f1f5f9',
+                  borderColor:
+                    activeBarriers.includes('ZUPT_LOCKED') || activeBarriers.includes('CRAWL_SNAP')
+                      ? '#ef4444'
+                      : 'transparent',
+                },
+              ]}>
+              <Text
+                style={[
+                  styles.barrierChipText,
+                  {
+                    color:
+                      activeBarriers.includes('ZUPT_LOCKED') || activeBarriers.includes('CRAWL_SNAP')
+                        ? '#ef4444'
+                        : '#10b981',
+                  },
+                ]}>
+                🛑{' '}
+                {activeBarriers.includes('ZUPT_LOCKED') || activeBarriers.includes('CRAWL_SNAP')
+                  ? 'ZUPT Lock'
+                  : 'Cruising'}
+              </Text>
+            </View>
+
+            {/* 4. Model Confidence */}
+            <View
+              style={[
+                styles.barrierChip,
+                {
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                  borderColor: 'rgba(16, 185, 129, 0.3)',
+                },
+              ]}>
+              <Text style={[styles.barrierChipText, { color: '#10b981', fontWeight: '800' }]}>
+                🎯 {modelConfidence}% Conf
+              </Text>
             </View>
           </View>
+
+          {/* Quick Tunnel / Offline GPS Simulator Button */}
+          {onToggleTunnelMode && (
+            <TouchableOpacity
+              style={[
+                styles.tunnelToggleBtn,
+                {
+                  backgroundColor: isTunnelMode
+                    ? 'rgba(245, 158, 11, 0.16)'
+                    : isDark
+                    ? 'rgba(30, 41, 59, 0.8)'
+                    : '#f8fafc',
+                  borderColor: isTunnelMode ? '#f59e0b' : isDark ? 'rgba(255,255,255,0.12)' : '#cbd5e1',
+                },
+              ]}
+              onPress={onToggleTunnelMode}
+              activeOpacity={0.75}>
+              <Text style={{ fontSize: 13 }}>{isTunnelMode ? '🛰️' : '🚇'}</Text>
+              <Text
+                style={[
+                  styles.tunnelToggleText,
+                  { color: isTunnelMode ? '#f59e0b' : isDark ? '#cbd5e1' : '#334155' },
+                ]}>
+                {isTunnelMode ? 'Exit Tunnel & Restore Real GPS Fix' : 'Simulate Tunnel (Blackout GPS -> Test Neural DR)'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {/* Real-time On-Device Sensor Telemetry */}
           {telemetry && (
@@ -366,7 +572,7 @@ export function NavigationCard({
                       styles.sensorLiveTitle,
                       { color: isDark ? '#94a3b8' : '#64748b' },
                     ]}>
-                    IMU Sensor Stream ({telemetry.bufferLength} samples)
+                    IMU 10Hz Window ({telemetry.bufferLength}/20)
                   </Text>
                 </View>
                 <Text
@@ -374,7 +580,7 @@ export function NavigationCard({
                     styles.sensorModelTag,
                     { color: isDark ? '#38bdf8' : '#0284c7' },
                   ]}>
-                  {gpsAvailable ? '⚡ Live Sensors' : '⚡ 2.0s Dead Reckoning'}
+                  {gpsAvailable ? '⚡ Live Sensors' : '🤖 Neural DR Active'}
                 </Text>
               </View>
 
@@ -736,5 +942,52 @@ const styles = StyleSheet.create({
   telVal: {
     fontSize: 10.5,
     fontWeight: '800',
+  },
+  speedGaugeContainer: {
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 2,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  speedGaugeFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  barrierChipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+    marginTop: 8,
+  },
+  barrierChip: {
+    flex: 1,
+    paddingVertical: 4,
+    paddingHorizontal: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  barrierChipText: {
+    fontSize: 9,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  tunnelToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginTop: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  tunnelToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

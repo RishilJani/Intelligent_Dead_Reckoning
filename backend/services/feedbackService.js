@@ -35,16 +35,17 @@ async function getFeedbacksByUserId(req, res) {
         return res.status(400).json({ message: "User Id is not valid" });
     }
     try {
-        const { data, error } = await supabase.from(FEEDBACKS_TBL).select(SELECT_QUERY).eq(USER_ID, user_id);
+        const { data, error } = await supabase
+            .from(FEEDBACKS_TBL)
+            .select(SELECT_QUERY)
+            .eq(USER_ID, user_id)
+            .order(CREATED_AT, { ascending: false });
+
         if (error) {
             console.error("error  ", error);
-            return res.status(404).json({ message: error.message });
+            return res.status(500).json({ message: error.message });
         }
-        if (data.length > 0) {
-            return res.status(200).json(data[0]);
-        } else {
-            return res.status(404).json({ message: "No Record Found" });
-        }
+        return res.status(200).json(data || []);
     } catch (err) {
         console.error('err = ', err);
         res.status(500).json({ message: err.message });
@@ -53,7 +54,8 @@ async function getFeedbacksByUserId(req, res) {
 
 // add feedback
 async function addFeedback(req, res) {
-    const { user_id, feedback_text, is_bug } = req.body;
+    const user_id = req.body.user_id || req.user?.user_id;
+    const { feedback_text, is_bug } = req.body;
 
     if (!user_id || !feedback_text || is_bug == undefined || is_bug == null) {
         return res.status(400).json({
@@ -105,11 +107,15 @@ async function updateFeedback(req, res) {
         return res.status(400).json({ message: "Invalid Feedback id" });
     }
     const { feedback_text, is_bug } = req.body;
-    const updated_date = new Date();
+    const updated_at = new Date();
     try {
+        const updatePayload = { updated_at };
+        if (feedback_text !== undefined) updatePayload.feedback_text = feedback_text;
+        if (is_bug !== undefined) updatePayload.is_bug = is_bug;
+
         const { data, error } = await supabase.from(FEEDBACKS_TBL).update(
-            { feedback_text, is_bug, updated_date }
-        ).eq(FEEDBACK_ID, feedback_id).select();
+            updatePayload
+        ).eq(FEEDBACK_ID, feedback_id).select(SELECT_QUERY);
 
         if (error) {
             console.error("error = ", error);

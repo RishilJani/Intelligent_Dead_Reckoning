@@ -212,6 +212,38 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Feedback & Bug Reports Navigation */}
+        <View style={styles.sectionWrapper}>
+          <Text style={[styles.sectionHeading, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+            HELP & COMMUNITY
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.horizontalSettingsBtn,
+              {
+                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : '#ffffff',
+                borderColor: isDark ? 'rgba(245, 158, 11, 0.35)' : 'rgba(217, 119, 6, 0.3)',
+              },
+            ]}
+            onPress={() => router.push('/feedback')}
+            activeOpacity={0.8}>
+            <View style={[styles.settingsBtnIconCircle, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
+              <Text style={{ fontSize: 20 }}>💬</Text>
+            </View>
+            <View style={styles.settingsBtnTextCol}>
+              <Text style={[styles.settingsBtnTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                Feedback & Bug Reports
+              </Text>
+              <Text style={[styles.settingsBtnSub, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                Report issues, suggest features, and track your submitted feedback
+              </Text>
+            </View>
+            <View style={[styles.settingsBtnArrowBadge, { backgroundColor: 'rgba(245, 158, 11, 0.18)' }]}>
+              <Text style={[styles.settingsBtnArrowText, { color: '#f59e0b' }]}>Open →</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
         {/* Account Authentication Actions */}
         <View style={styles.sectionWrapper}>
           <Text style={[styles.sectionHeading, { color: isDark ? '#38bdf8' : '#0284c7' }]}>

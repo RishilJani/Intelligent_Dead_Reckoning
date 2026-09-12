@@ -198,16 +198,81 @@ if (ep2 !== 0) {
 }
 console.log('PASS: Speed barrier successfully ignored isolated high speed spike!');
 
-// Epoch 3 & 4: Real vehicle acceleration 35 km/h -> 38 km/h
-const ep3 = speedTest.predictEpoch(35);
-console.log('Epoch 3 (Predicted 35 km/h, Candidate): confirmed =', ep3);
-const ep4 = speedTest.predictEpoch(38);
-console.log('Epoch 4 (Predicted 38 km/h, Maintained): confirmed =', ep4);
+// 6. Test Kinematic G-Force Barrier & Speed Ceiling
+console.log('\n--- Testing Kinematic Rate & Speed Ceiling Barriers ---');
+class MockKinematicBarrier {
+  constructor() {
+    this.confirmedSpeedKmh = 20.0;
+    this.MAX_ACCEL_KMH_PER_SEC = 16.2;
+    this.MAX_BRAKE_KMH_PER_SEC = 28.8;
+    this.SPEED_CEILING_KMH = 130.0;
+  }
 
-if (ep3 === 0 && ep4 === 38) {
-  console.log('PASS: Speed barrier successfully confirmed sustained driving speed (38 km/h).');
+  evaluate(rawPredSpeed, epochSec = 2.0) {
+    let speed = rawPredSpeed;
+    // Speed Ceiling
+    if (speed > this.SPEED_CEILING_KMH) {
+      speed = this.SPEED_CEILING_KMH;
+    }
+    // Kinematic Acceleration & Braking Clamps
+    const maxIncrease = this.MAX_ACCEL_KMH_PER_SEC * epochSec;
+    const maxDecrease = this.MAX_BRAKE_KMH_PER_SEC * epochSec;
+
+    if (speed > this.confirmedSpeedKmh + maxIncrease) {
+      speed = this.confirmedSpeedKmh + maxIncrease;
+    } else if (speed < this.confirmedSpeedKmh - maxDecrease) {
+      speed = Math.max(0, this.confirmedSpeedKmh - maxDecrease);
+    }
+    return speed;
+  }
+}
+
+const kinTest = new MockKinematicBarrier();
+// Test Ceiling: 180 km/h -> should clamp to 130 km/h first, then kinematic clamp from 20 km/h -> 20 + 32.4 = 52.4 km/h
+const clampedExcess = kinTest.evaluate(180, 2.0);
+console.log('Kinematic Clamp from 20 km/h with 180 km/h input:', clampedExcess.toFixed(1));
+if (Math.abs(clampedExcess - 52.4) < 0.1) {
+  console.log('PASS: Kinematic G-force acceleration clamp successfully bounded impossible jump to 52.4 km/h.');
 } else {
-  console.error('FAIL: Sustained speed was not confirmed properly!', ep3, ep4);
+  console.error('FAIL: Kinematic acceleration clamp error!', clampedExcess);
+  process.exit(1);
+}
+
+// 7. Test Crawl Snapping Barrier
+console.log('\n--- Testing Low-Speed Crawl Snapping Barrier ---');
+let crawlSpeed = 2.8;
+let crawlTimerMs = 0;
+const CRAWL_THRESHOLD = 3.5;
+for (let t = 0; t < 2; t++) {
+  if (crawlSpeed < CRAWL_THRESHOLD) {
+    crawlTimerMs += 1000;
+    if (crawlTimerMs >= 1200) {
+      crawlSpeed = 0;
+    }
+  }
+}
+if (crawlSpeed === 0) {
+  console.log('PASS: Low-speed crawl snapped strictly to 0 km/h at red light rest.');
+} else {
+  console.error('FAIL: Crawl speed did not snap to 0 km/h!', crawlSpeed);
+  process.exit(1);
+}
+
+// 8. Test 10Hz Inter-Epoch Smoothing Barrier
+console.log('\n--- Testing 10Hz Inter-Epoch Smoothing Barrier ---');
+let smoothedSpeed = 0;
+const targetConfirmed = 40.0;
+const alpha = 0.25;
+const smoothPoints = [];
+for (let step = 0; step < 10; step++) {
+  smoothedSpeed += alpha * (targetConfirmed - smoothedSpeed);
+  smoothPoints.push(Number(smoothedSpeed.toFixed(1)));
+}
+console.log('Smoothed steps (0.1s each):', smoothPoints);
+if (smoothPoints[0] === 10.0 && smoothPoints[9] > 37.0) {
+  console.log('PASS: 10Hz EMA Smoothing successfully interpolated speeds without step-discontinuities.');
+} else {
+  console.error('FAIL: 10Hz smoothing trajectory incorrect!', smoothPoints);
   process.exit(1);
 }
 

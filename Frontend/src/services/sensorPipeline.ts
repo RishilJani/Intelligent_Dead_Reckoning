@@ -24,6 +24,8 @@ export interface LiveSensorTelemetry {
   gyroMag: number;
   jerk: number;
   bufferLength: number;
+  isClippingProtected?: boolean;
+  isTwitchSpikeSuppressed?: boolean;
 }
 
 function getNativeSensors() {
@@ -105,6 +107,12 @@ export class SensorPipeline {
   private readonly SUDDEN_GYRO_DELTA = 0.35; // rad/s delta from confirmed baseline
   private readonly MAINTAIN_ACCEL_TOLERANCE = 2.5; // m/s² tolerance to confirm sustained change
   private readonly MAINTAIN_GYRO_TOLERANCE = 0.5; // rad/s tolerance to confirm sustained change
+
+  // ── SENSOR SATURATION & EXTREME IMPACT CLIPPING BARRIER ──
+  private readonly MAX_RAW_ACCEL = 35.0; // m/s² (~3.5g hard phone drop/slap ceiling)
+  private readonly MAX_RAW_GYRO = 15.0; // rad/s (~860 deg/s rotational limit)
+  private isClippingActive = false;
+  private isTwitchSuppressedActive = false;
 
   public static getInstance(): SensorPipeline {
     if (!SensorPipeline.instance) {
@@ -216,6 +224,27 @@ export class SensorPipeline {
     let gx = this.currentGyro.x;
     let gy = this.currentGyro.y;
     let gz = this.currentGyro.z;
+
+    // ── HARDWARE CLIPPING & ANOMALY BARRIER ────────────────────
+    // Clamps extreme shock spikes (phone drop, slap against dash) to prevent buffer destabilization
+    let clipped = false;
+    const rawAccelMag = Math.sqrt(ax * ax + ay * ay + az * az);
+    if (rawAccelMag > this.MAX_RAW_ACCEL && rawAccelMag > 0) {
+      const scale = this.MAX_RAW_ACCEL / rawAccelMag;
+      ax *= scale;
+      ay *= scale;
+      az *= scale;
+      clipped = true;
+    }
+    const rawGyroMag = Math.sqrt(gx * gx + gy * gy + gz * gz);
+    if (rawGyroMag > this.MAX_RAW_GYRO && rawGyroMag > 0) {
+      const scale = this.MAX_RAW_GYRO / rawGyroMag;
+      gx *= scale;
+      gy *= scale;
+      gz *= scale;
+      clipped = true;
+    }
+    this.isClippingActive = clipped;
 
     // If external hardware bridge has not updated within 300ms, add realistic MEMS sensor noise floor
     if (now - this.lastExternalSensorTimestamp > 300) {
@@ -379,6 +408,11 @@ export class SensorPipeline {
       }
     }
 
+    // Track twitch suppression state for HUD telemetry
+    this.isTwitchSuppressedActive =
+      this.pendingCandidateSensor !== null ||
+      (!isDeviceStill && (fedAx !== ax || fedAy !== ay || fedAz !== az || fedGx !== gx || fedGy !== gy || fedGz !== gz));
+
     const accelMag = Math.sqrt(fedAx * fedAx + fedAy * fedAy + fedAz * fedAz);
     const linearAccelMag = Math.abs(accelMag - 9.81);
     const gyroMag = Math.sqrt(fedGx * fedGx + fedGy * fedGy + fedGz * fedGz);
@@ -451,6 +485,8 @@ export class SensorPipeline {
       gyroMag: Number(gyroMag.toFixed(3)),
       jerk: Number(jerk.toFixed(1)),
       bufferLength: this.buffer.length,
+      isClippingProtected: this.isClippingActive,
+      isTwitchSpikeSuppressed: this.isTwitchSuppressedActive,
     };
   }
 
