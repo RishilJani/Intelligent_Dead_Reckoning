@@ -18,7 +18,7 @@ interface FloatingSearchBarProps {
   endPoint: LocationPoint | null;
   onSelectEndPoint: (point: LocationPoint) => void;
   onClearEndPoint: () => void;
-  onOpenSettings?: () => void;
+  onOpenProfile?: () => void;
   isGuest?: boolean;
   onRequireAuth?: () => void;
   userName?: string | null;
@@ -28,7 +28,7 @@ export function FloatingSearchBar({
   endPoint,
   onSelectEndPoint,
   onClearEndPoint,
-  onOpenSettings,
+  onOpenProfile,
   isGuest = false,
   onRequireAuth,
   userName,
@@ -150,13 +150,22 @@ export function FloatingSearchBar({
               Sign In 🚀
             </Text>
           </View>
-          {onOpenSettings && (
+          {onOpenProfile && (
             <TouchableOpacity
-              style={styles.settingsBtn}
-              onPress={onOpenSettings}
-              activeOpacity={0.7}
-              accessibilityLabel="Settings">
-              <Text style={styles.settingsIcon}>⚙️</Text>
+              style={styles.profileBtn}
+              onPress={onOpenProfile}
+              activeOpacity={0.75}
+              accessibilityLabel="User Profile">
+              <View
+                style={[
+                  styles.profileIconCircle,
+                  {
+                    backgroundColor: isDark ? 'rgba(56, 189, 248, 0.18)' : '#e0f2fe',
+                    borderColor: isDark ? '#38bdf8' : '#0284c7',
+                  },
+                ]}>
+                <Text style={styles.profileIconText}>👤</Text>
+              </View>
             </TouchableOpacity>
           )}
         </TouchableOpacity>
@@ -221,19 +230,28 @@ export function FloatingSearchBar({
                 borderColor: 'rgba(56, 189, 248, 0.3)',
               }}>
               <Text style={{ color: '#38bdf8', fontSize: 11, fontWeight: '700' }}>
-                👤 {userName}
+                {userName}
               </Text>
             </View>
           )}
 
-          {/* Divider & Optional Settings Button */}
-          {onOpenSettings && (
+          {/* Profile Button on side of search bar */}
+          {onOpenProfile && (
             <TouchableOpacity
-              style={styles.settingsBtn}
-              onPress={onOpenSettings}
-              activeOpacity={0.7}
-              accessibilityLabel="Settings">
-              <Text style={styles.settingsIcon}>⚙️</Text>
+              style={styles.profileBtn}
+              onPress={onOpenProfile}
+              activeOpacity={0.75}
+              accessibilityLabel="User Profile">
+              <View
+                style={[
+                  styles.profileIconCircle,
+                  {
+                    backgroundColor: isDark ? 'rgba(56, 189, 248, 0.18)' : '#e0f2fe',
+                    borderColor: isDark ? '#38bdf8' : '#0284c7',
+                  },
+                ]}>
+                <Text style={styles.profileIconText}>👤</Text>
+              </View>
             </TouchableOpacity>
           )}
         </View>
@@ -369,6 +387,25 @@ const styles = StyleSheet.create({
   },
   settingsIcon: {
     fontSize: 18,
+  },
+  profileBtn: {
+    marginLeft: 8,
+    paddingLeft: 8,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: 'rgba(148, 163, 184, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileIconText: {
+    fontSize: 15,
   },
   suggestionsDropdown: {
     width: '100%',

@@ -12,7 +12,7 @@ import { useLocationTracker, LiveCoords } from '@/hooks/useLocationTracker';
 import { DeadReckoningEngine, DeadReckoningState } from '@/services/deadReckoningEngine';
 import { SensorPipeline, LiveSensorTelemetry } from '@/services/sensorPipeline';
 
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/services/authContext';
 
 import {
@@ -24,6 +24,7 @@ import {
 
 export default function NavigationScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ openSettings?: string }>();
   const { user, isGuest, logout } = useAuth();
 
   const colorScheme = useColorScheme();
@@ -36,6 +37,11 @@ export default function NavigationScreen() {
   // Prompt or redirect guest user to sign up page
   const handleRequireAuth = useCallback(() => {
     router.push('/signup');
+  }, [router]);
+
+  // Navigate to user profile page
+  const handleOpenProfile = useCallback(() => {
+    router.push('/profile');
   }, [router]);
 
   // Cross-platform map command sender
@@ -147,6 +153,21 @@ export default function NavigationScreen() {
   useEffect(() => {
     deadReckoning.setOfflineMode(isOfflineMode);
   }, [isOfflineMode, deadReckoning]);
+
+  // Open Settings modal if navigated from profile with openSettings param
+  useEffect(() => {
+    if (params?.openSettings === '1') {
+      setShowSettingsModal(true);
+    }
+  }, [params?.openSettings]);
+
+  // Calculate dynamic bottom position for the bottom-right re-locate button
+  const reLocateBottomOffset = React.useMemo(() => {
+    if (isNavigating) return 265;
+    if (isPreviewingDirections) return 235;
+    if (selectedPlace) return 180;
+    return Math.max(insets.bottom + 20, 24);
+  }, [isNavigating, isPreviewingDirections, selectedPlace, insets.bottom]);
 
   // Update Route helper
   const updateRoute = (
@@ -488,21 +509,20 @@ export default function NavigationScreen() {
       {/* 1. Full Screen Interactive Map with Base64 IndexedDB Tile Caching */}
       <DisplayMap ref={mapRef} onMapMessage={handleMapMessage} />
 
-      {/* 2. Floating Map Action Controls (Side GPS & Settings) */}
+      {/* 2. Floating Re-locate Button at Bottom Right (dynamic bottom offset) */}
       <MapControls
         isLiveTracking={isLiveTracking}
-        showSettings={showSettingsModal}
         onCenterGPS={handleCenterGPS}
-        onToggleSettings={() => setShowSettingsModal(true)}
+        bottomOffset={reLocateBottomOffset}
       />
 
-      {/* 3. Google Maps Style Floating Search Bar (Top Center) */}
+      {/* 3. Google Maps Style Floating Search Bar (Top Center) with Profile button */}
       {!isNavigating && !isPreviewingDirections && (
         <FloatingSearchBar
           endPoint={selectedPlace || endPoint}
           onSelectEndPoint={handleSelectEndPoint}
           onClearEndPoint={handleClearEndPoint}
-          onOpenSettings={() => setShowSettingsModal(true)}
+          onOpenProfile={handleOpenProfile}
           isGuest={isGuest}
           onRequireAuth={handleRequireAuth}
           userName={user?.username}
