@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
 import { LocationPoint } from '@/types/navigation';
 import { reverseGeocode } from '@/services/geocoding';
+import { saveLastKnownLocation, getLastKnownLocation } from '@/services/userCache';
 
 export interface LiveCoords {
   lat: number;
@@ -19,14 +20,41 @@ interface UseLocationTrackerOptions {
 export function useLocationTracker(options: UseLocationTrackerOptions = {}) {
   const { onInitialLocationResolved, onLocationUpdate } = options;
 
-  const [startPoint, setStartPoint] = useState<LocationPoint>({
-    lat: 28.6139,
-    lon: 77.2090,
-    name: 'Locating current GPS position...',
-    isLiveLocation: true,
+  const initialCached = getLastKnownLocation();
+
+  const [startPoint, setStartPoint] = useState<LocationPoint>(() => {
+    if (initialCached) {
+      return {
+        lat: initialCached.lat,
+        lon: initialCached.lon,
+        name: initialCached.name || '📍 Last Known GPS Position',
+        isLiveLocation: true,
+        isDefaultPlaceholder: false,
+      };
+    }
+    return {
+      lat: 28.6139,
+      lon: 77.2090,
+      name: 'Locating current GPS position...',
+      isLiveLocation: true,
+      isDefaultPlaceholder: true,
+    };
   });
-  const [liveCoords, setLiveCoords] = useState<LiveCoords | null>(null);
-  const [isLocatingOnStartup, setIsLocatingOnStartup] = useState<boolean>(true);
+
+  const [liveCoords, setLiveCoords] = useState<LiveCoords | null>(() => {
+    if (initialCached) {
+      return {
+        lat: initialCached.lat,
+        lon: initialCached.lon,
+        accuracy: initialCached.accuracy || 10,
+        heading: initialCached.heading || 0,
+        speedKmh: initialCached.speedKmh || 0,
+      };
+    }
+    return null;
+  });
+
+  const [isLocatingOnStartup, setIsLocatingOnStartup] = useState<boolean>(!initialCached);
   const [isLiveTracking, setIsLiveTracking] = useState<boolean>(true);
 
   // Keep references to latest callbacks to avoid restarting subscription on parent re-renders
@@ -71,7 +99,17 @@ export function useLocationTracker(options: UseLocationTrackerOptions = {}) {
             lon,
             name: `📍 Current Location (${placeName})`,
             isLiveLocation: true,
+            isDefaultPlaceholder: false,
           };
+
+          saveLastKnownLocation({
+            lat,
+            lon,
+            accuracy,
+            heading,
+            speedKmh,
+            name: initialStart.name,
+          });
 
           setStartPoint(initialStart);
           if (onInitialResolvedRef.current) {
@@ -104,6 +142,14 @@ export function useLocationTracker(options: UseLocationTrackerOptions = {}) {
                 speedKmh: newSpeedKmh,
               };
 
+              saveLastKnownLocation({
+                lat: newLat,
+                lon: newLon,
+                accuracy: newAcc,
+                heading: newHead,
+                speedKmh: newSpeedKmh,
+              });
+
               setLiveCoords(updatedCoords);
               if (onLocationUpdateRef.current) {
                 onLocationUpdateRef.current(updatedCoords);
@@ -122,6 +168,30 @@ export function useLocationTracker(options: UseLocationTrackerOptions = {}) {
     }
 
     function fallbackToDefaultLocation() {
+      const cached = getLastKnownLocation();
+      if (cached) {
+        const cachedPoint: LocationPoint = {
+          lat: cached.lat,
+          lon: cached.lon,
+          name: cached.name || '📍 Last Known GPS Location',
+          isLiveLocation: true,
+          isDefaultPlaceholder: false,
+        };
+        const cachedCoords: LiveCoords = {
+          lat: cached.lat,
+          lon: cached.lon,
+          accuracy: cached.accuracy || 15,
+          heading: cached.heading || 0,
+          speedKmh: cached.speedKmh || 0,
+        };
+        setStartPoint(cachedPoint);
+        setLiveCoords(cachedCoords);
+        if (onInitialResolvedRef.current) {
+          onInitialResolvedRef.current(cachedPoint, cachedCoords);
+        }
+        return;
+      }
+
       const fallbackLat = 28.6139;
       const fallbackLon = 77.2090;
       const fallbackPoint: LocationPoint = {
@@ -129,6 +199,7 @@ export function useLocationTracker(options: UseLocationTrackerOptions = {}) {
         lon: fallbackLon,
         name: 'New Delhi, India',
         isLiveLocation: false,
+        isDefaultPlaceholder: true,
       };
       setStartPoint(fallbackPoint);
       const fallbackCoords: LiveCoords = { lat: fallbackLat, lon: fallbackLon, accuracy: 20, heading: 0, speedKmh: 0 };

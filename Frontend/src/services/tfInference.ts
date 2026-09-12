@@ -11,10 +11,12 @@
  */
 
 import speedWeightsData from '@/../assets/models/tf_speed_weights.json';
+import walkingWeightsData from '@/../assets/models/walking_speed_weights.json';
 
 export interface ModelPrediction {
   speedKmh: number;
   yawRateDps?: number;
+  modelUsed?: 'walking_gru' | 'vehicle_cnn_lstm';
 }
 
 interface SpeedMeta {
@@ -39,9 +41,32 @@ interface SpeedWeightsStructure {
   speed: Record<string, any>;
 }
 
+interface WalkingMeta {
+  arch: string;
+  source_checkpoint?: string;
+  task: string;
+  unit: string;
+  window_size: number;
+  feature_columns: string[];
+  mean: number[];
+  std: number[];
+}
+
+interface WalkingWeightsStructure {
+  _meta: {
+    format: string;
+    model: WalkingMeta;
+  };
+  weights: Record<string, any>;
+}
+
 const data = speedWeightsData as unknown as SpeedWeightsStructure;
 const metaSpeed = data._meta.speed_model;
 const speedWeights = data.speed;
+
+const walkData = walkingWeightsData as unknown as WalkingWeightsStructure;
+const metaWalking = walkData._meta.model;
+const walkingWeights = walkData.weights;
 
 // Numerical helpers
 function sigmoid(x: number): number {
@@ -320,20 +345,161 @@ export function predictSpeed(rawWindow20x10: number[][]): number {
 }
 
 /**
- * Dead Reckoning Speed Predictor executing TensorFlow Speed Regressor
- * Expects 20-sample rolling IMU window from sensor pipeline.
+ * Single step of GRU cell (48 hidden units, 9 input features)
+ * Gates: r (reset), z (update), n (new candidate)
  */
-export function predictDeadReckoning(rawWindow: number[][]): ModelPrediction {
+function stepGruCell(
+  xt: Float32Array | number[],
+  hPrev: Float32Array,
+  w_ih: number[][],
+  w_hh: number[][],
+  b_ih: number[],
+  b_hh: number[]
+): Float32Array {
+  const hiddenSize = 48;
+  const inSize = xt.length; // 9
+  const gi = new Float32Array(144);
+  const gh = new Float32Array(144);
+
+  // gi = W_ih * x + b_ih
+  for (let i = 0; i < 144; i++) {
+    let sum = b_ih[i];
+    const wRow = w_ih[i];
+    for (let j = 0; j < inSize; j++) {
+      sum += wRow[j] * xt[j];
+    }
+    gi[i] = sum;
+  }
+
+  // gh = W_hh * hPrev + b_hh
+  for (let i = 0; i < 144; i++) {
+    let sum = b_hh[i];
+    const wRow = w_hh[i];
+    for (let j = 0; j < hiddenSize; j++) {
+      sum += wRow[j] * hPrev[j];
+    }
+    gh[i] = sum;
+  }
+
+  const hNext = new Float32Array(hiddenSize);
+  for (let i = 0; i < hiddenSize; i++) {
+    const r = sigmoid(gi[i] + gh[i]);
+    const z = sigmoid(gi[48 + i] + gh[48 + i]);
+    const n = tanh(gi[96 + i] + r * gh[96 + i]);
+    hNext[i] = (1 - z) * n + z * hPrev[i];
+  }
+
+  return hNext;
+}
+
+/**
+ * Predict Walking Speed (km/h) using Specialized Walking GRU Model
+ * Input: 10-sample rolling IMU window @ 10Hz (1.0s window)
+ * Architecture: GRU(9 -> 48) + Linear(48 -> 24) + ReLU + Linear(24 -> 1)
+ * Output: Walking speed in km/h (converted from m/s)
+ */
+export function predictWalkingSpeed(rawWindow: number[][]): number {
+  const window10 = rawWindow.length >= 10 ? rawWindow.slice(-10) : rawWindow;
+  const seqLen = 10;
+  const inFeats = 9;
+
+  // Extract 9 features and standardize: (x - mean) / std
+  // Feature columns: [accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z, accel_mag, gyro_mag, jerk]
+  const inputSeq: Float32Array[] = [];
+  for (let t = 0; t < seqLen; t++) {
+    const row = window10[t] || [];
+    const vec = new Float32Array(inFeats);
+    const raw9 = [
+      row[0] != null ? row[0] : 0, // accel_x
+      row[1] != null ? row[1] : 0, // accel_y
+      row[2] != null ? row[2] : 9.81, // accel_z
+      row[3] != null ? row[3] : 0, // gyro_x
+      row[4] != null ? row[4] : 0, // gyro_y
+      row[5] != null ? row[5] : 0, // gyro_z
+      row[6] != null ? row[6] : 9.81, // accel_mag
+      row[8] != null ? row[8] : 0, // gyro_mag
+      row[9] != null ? row[9] : 0, // jerk
+    ];
+
+    for (let f = 0; f < inFeats; f++) {
+      const val = raw9[f];
+      const m = metaWalking.mean[f];
+      const s = metaWalking.std[f] || 1.0;
+      vec[f] = (val - m) / s;
+    }
+    inputSeq.push(vec);
+  }
+
+  // GRU sequence execution
+  let h: any = new Float32Array(48);
+  const w_ih = walkingWeights['rnn.weight_ih_l0'];
+  const w_hh = walkingWeights['rnn.weight_hh_l0'];
+  const b_ih = walkingWeights['rnn.bias_ih_l0'];
+  const b_hh = walkingWeights['rnn.bias_hh_l0'];
+
+  for (let t = 0; t < seqLen; t++) {
+    h = stepGruCell(inputSeq[t], h, w_ih, w_hh, b_ih, b_hh);
+  }
+
+  // Head: Linear(48 -> 24) + ReLU + Linear(24 -> 1)
+  const wH0: number[][] = walkingWeights['head.0.weight'];
+  const bH0: number[] = walkingWeights['head.0.bias'];
+  const h0 = new Float32Array(24);
+  for (let i = 0; i < 24; i++) {
+    let sum = bH0[i];
+    const row = wH0[i];
+    for (let j = 0; j < 48; j++) {
+      sum += row[j] * h[j];
+    }
+    h0[i] = sum > 0 ? sum : 0;
+  }
+
+  const wH2: number[][] = walkingWeights['head.2.weight'];
+  const bH2: number[] = walkingWeights['head.2.bias'];
+  let predMs = bH2[0];
+  const rowH2 = wH2[0];
+  for (let j = 0; j < 24; j++) {
+    predMs += rowH2[j] * h0[j];
+  }
+
+  // Non-negative clamping and conversion from m/s to km/h
+  const cleanMs = Math.max(0, predMs);
+  const speedKmh = cleanMs * 3.6;
+  return speedKmh;
+}
+
+/**
+ * Dead Reckoning Speed Predictor
+ * Automatically dispatches to the specialized Walking Speed Model when in walking/pedestrian mode,
+ * or the Vehicle Speed Regressor when in driving/auto/bicycle/truck mode.
+ */
+export function predictDeadReckoning(
+  rawWindow: number[][],
+  travelMode: string = 'auto'
+): ModelPrediction {
+  if (travelMode === 'pedestrian') {
+    if (rawWindow.length < 10) {
+      throw new Error(`Invalid window shape [${rawWindow.length}]. Expected at least 10 samples for walking model.`);
+    }
+    const speedKmh = predictWalkingSpeed(rawWindow);
+    return {
+      speedKmh: Number(speedKmh.toFixed(1)),
+      yawRateDps: 0,
+      modelUsed: 'walking_gru',
+    };
+  }
+
+  // Vehicle speed regressor
   if (rawWindow.length !== 20 || rawWindow[0].length < 6) {
     throw new Error(`Invalid window shape [${rawWindow.length}, ${rawWindow[0]?.length}]. Expected [20, 10].`);
   }
 
-  // Predict Speed using best_speed_model2.pt weights
   const speedKmh = predictSpeed(rawWindow);
 
   return {
     speedKmh: Number(speedKmh.toFixed(1)),
     yawRateDps: 0,
+    modelUsed: 'vehicle_cnn_lstm',
   };
 }
 

@@ -1,5 +1,6 @@
 import { SensorPipeline, LiveSensorTelemetry } from './sensorPipeline';
 import { predictDeadReckoning, ModelPrediction } from './tfInference';
+import { CostingMode } from '@/types/navigation';
 
 export interface DeadReckoningState {
   lat: number;
@@ -27,6 +28,7 @@ export class DeadReckoningEngine {
   private sensorPipeline: SensorPipeline;
   private isNavigating = false;
   private isOfflineMode = false;
+  private travelMode: CostingMode = 'auto';
   private lastGpsTimestamp = 0;
   private lastGpsCoords: { lat: number; lon: number; heading: number; speedKmh: number; accuracyMeters?: number } | null = null;
   /** Fast offline GPS timeout: if no GPS fix arrives within 1.8s, dead reckoning takes over */
@@ -55,9 +57,10 @@ export class DeadReckoningEngine {
   private routeSegmentProgressMeters = 0;
   private onStateUpdateCallbacks: ((state: DeadReckoningState) => void)[] = [];
 
-  // Model prediction 2.0s interval control
+  // Model prediction interval control (2.0s for vehicle, 1.0s for walking)
   private lastModelInferenceTime = 0;
-  private readonly MODEL_INTERVAL_MS = 2000; // 2.0s gap between neural model predictions
+  private readonly MODEL_INTERVAL_MS = 2000; // 2.0s gap between vehicle neural model predictions
+  private readonly WALKING_MODEL_INTERVAL_MS = 1000; // 1.0s gap between walking neural model predictions
   private lastPredictedSpeedKmh = 0;
   private lastPredictedYawRateDps = 0;
 
@@ -170,6 +173,16 @@ export class DeadReckoningEngine {
     const nextVal = !this.isOfflineMode;
     this.setOfflineMode(nextVal);
     return nextVal;
+  }
+
+  public setCostingMode(mode: CostingMode) {
+    this.travelMode = mode;
+    // Reset prediction interval timer so new mode model runs immediately
+    this.lastModelInferenceTime = 0;
+  }
+
+  public getCostingMode(): CostingMode {
+    return this.travelMode;
   }
 
   public setActiveRoute(coords: [number, number][]) {
@@ -433,26 +446,42 @@ export class DeadReckoningEngine {
           this.crawlTimerMs = 0;
           this.activeBarriers.add('ZUPT_LOCKED');
         } else {
-          if (now - this.lastModelInferenceTime >= this.MODEL_INTERVAL_MS) {
-            // Execute Model prediction with a 2-second interval gap (20 samples window @ 10Hz)
+          const isPedestrian = this.travelMode === 'pedestrian';
+          const modelInterval = isPedestrian ? this.WALKING_MODEL_INTERVAL_MS : this.MODEL_INTERVAL_MS;
+
+          if (now - this.lastModelInferenceTime >= modelInterval) {
+            // Execute Model prediction (Specialized Walking GRU for pedestrian or Vehicle CNN-LSTM for driving)
             try {
-              const pred: ModelPrediction = predictDeadReckoning(windowData);
+              const pred: ModelPrediction = predictDeadReckoning(windowData, this.travelMode);
               let rawPredSpeed = Math.max(0, pred.speedKmh);
               this.rawModelSpeedKmh = Number(rawPredSpeed.toFixed(1));
 
+              if (isPedestrian) {
+                this.activeBarriers.add('WALK_MODEL_ACTIVE');
+              } else {
+                this.activeBarriers.add('VEHICLE_MODEL_ACTIVE');
+              }
+
+              // Dynamic barrier parameters based on active travel mode
+              const speedCeiling = isPedestrian ? 12.0 : this.SPEED_CEILING_KMH;
+              const maxAccelPerSec = isPedestrian ? 6.0 : this.MAX_ACCEL_KMH_PER_SEC;
+              const maxBrakePerSec = isPedestrian ? 8.0 : this.MAX_BRAKE_KMH_PER_SEC;
+              const suddenJumpThreshold = isPedestrian ? 4.0 : this.SUDDEN_SPEED_JUMP_KMH;
+              const speedMaintainTolerance = isPedestrian ? 3.0 : this.SPEED_MAINTAIN_TOLERANCE_KMH;
+              const crawlThreshold = isPedestrian ? 0.9 : this.CRAWL_SPEED_THRESHOLD_KMH;
+
               // ── BARRIER 1: Physical Speed Ceiling Barrier ───────────────
-              if (rawPredSpeed > this.SPEED_CEILING_KMH) {
-                rawPredSpeed = this.SPEED_CEILING_KMH;
+              if (rawPredSpeed > speedCeiling) {
+                rawPredSpeed = speedCeiling;
                 this.activeBarriers.add('CEILING_LIMIT');
               }
 
               // ── BARRIER 2: Kinematic G-Force Rate Barrier ────────────────
-              // Limits rate of speed change to physical passenger car dynamics
               const epochDeltaSec = this.lastModelInferenceTime > 0
                 ? Math.min(3.0, (now - this.lastModelInferenceTime) / 1000)
-                : 2.0;
-              const maxAllowedIncrease = this.MAX_ACCEL_KMH_PER_SEC * epochDeltaSec;
-              const maxAllowedDecrease = this.MAX_BRAKE_KMH_PER_SEC * epochDeltaSec;
+                : (isPedestrian ? 1.0 : 2.0);
+              const maxAllowedIncrease = maxAccelPerSec * epochDeltaSec;
+              const maxAllowedDecrease = maxBrakePerSec * epochDeltaSec;
 
               if (rawPredSpeed > this.confirmedSpeedKmh + maxAllowedIncrease) {
                 rawPredSpeed = this.confirmedSpeedKmh + maxAllowedIncrease;
@@ -465,7 +494,7 @@ export class DeadReckoningEngine {
               // ── BARRIER 3: Transient Spike Candidate Verification Barrier 
               if (this.candidateHighSpeedKmh === null) {
                 const jump = rawPredSpeed - this.confirmedSpeedKmh;
-                if (jump > this.SUDDEN_SPEED_JUMP_KMH) {
+                if (jump > suddenJumpThreshold) {
                   this.candidateHighSpeedKmh = rawPredSpeed;
                   this.activeBarriers.add('SPIKE_GUARD');
                   this.lastPredictedSpeedKmh = this.confirmedSpeedKmh;
@@ -476,11 +505,11 @@ export class DeadReckoningEngine {
               } else {
                 const diffFromCandidate = Math.abs(rawPredSpeed - this.candidateHighSpeedKmh);
                 const isMaintained =
-                  diffFromCandidate <= this.SPEED_MAINTAIN_TOLERANCE_KMH ||
-                  rawPredSpeed >= this.candidateHighSpeedKmh - 5.0;
+                  diffFromCandidate <= speedMaintainTolerance ||
+                  rawPredSpeed >= this.candidateHighSpeedKmh - (isPedestrian ? 2.0 : 5.0);
 
                 if (isMaintained) {
-                  // Sustained high speed: genuine acceleration confirmed!
+                  // Sustained speed: genuine acceleration confirmed!
                   this.confirmedSpeedKmh = rawPredSpeed;
                   this.lastPredictedSpeedKmh = rawPredSpeed;
                   this.candidateHighSpeedKmh = null;
@@ -488,7 +517,7 @@ export class DeadReckoningEngine {
                   // Transient spike rejected! Discard candidate and keep baseline
                   this.candidateHighSpeedKmh = null;
                   this.activeBarriers.add('SPIKE_REJECTED');
-                  if (rawPredSpeed <= this.confirmedSpeedKmh + 5.0) {
+                  if (rawPredSpeed <= this.confirmedSpeedKmh + (isPedestrian ? 1.5 : 5.0)) {
                     this.confirmedSpeedKmh = rawPredSpeed;
                   }
                   this.lastPredictedSpeedKmh = this.confirmedSpeedKmh;
@@ -496,11 +525,10 @@ export class DeadReckoningEngine {
               }
 
               // ── BARRIER 4: Low-Speed Crawl / Creep Snapping ─────────────
-              // At red lights or stop signs, engine idling vibrations can produce false 2-4 km/h predictions
               const linAccel = telemetry?.accelMag ? Math.abs(telemetry.accelMag - 9.81) : 0;
-              if (this.confirmedSpeedKmh < this.CRAWL_SPEED_THRESHOLD_KMH && linAccel < 0.4) {
-                this.crawlTimerMs += this.MODEL_INTERVAL_MS;
-                if (this.crawlTimerMs >= 1200) {
+              if (this.confirmedSpeedKmh < crawlThreshold && linAccel < (isPedestrian ? 0.3 : 0.4)) {
+                this.crawlTimerMs += modelInterval;
+                if (this.crawlTimerMs >= (isPedestrian ? 800 : 1200)) {
                   this.confirmedSpeedKmh = 0;
                   this.lastPredictedSpeedKmh = 0;
                   this.activeBarriers.add('CRAWL_SNAP');

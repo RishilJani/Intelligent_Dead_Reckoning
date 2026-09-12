@@ -1,7 +1,21 @@
-import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, useColorScheme, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  ScrollView,
+  Modal,
+  ActivityIndicator,
+  Alert,
+  Platform,
+} from 'react-native';
 import { RouteStatistics, CostingMode, LocationPoint } from '@/types/navigation';
 import { LiveSensorTelemetry } from '@/services/sensorPipeline';
+import { addFavourite } from '@/services/favouriteService';
+import { getUserFromCache } from '@/services/userCache';
 
 interface NavigationCardProps {
   routeStats: RouteStatistics | null;
@@ -74,6 +88,160 @@ export function NavigationCard({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
+  // Favourite Place Modal State
+  const [showFavModal, setShowFavModal] = useState(false);
+  const [favNameInput, setFavNameInput] = useState('');
+  const [isSavingFav, setIsSavingFav] = useState(false);
+  const [favError, setFavError] = useState<string | null>(null);
+  const [favSuccess, setFavSuccess] = useState(false);
+
+  const handleOpenFavModal = () => {
+    if (isGuest) {
+      if (onRequireAuth) {
+        onRequireAuth();
+      } else {
+        Alert.alert('Sign In Required', 'Please log in or sign up to save favourite places.');
+      }
+      return;
+    }
+    const defaultName = selectedPlace?.name || 'My Favourite Place';
+    setFavNameInput(defaultName);
+    setFavError(null);
+    setShowFavModal(true);
+  };
+
+  const handleSaveFavourite = async () => {
+    if (!selectedPlace) return;
+    const name = favNameInput.trim();
+    if (!name) {
+      setFavError('Please enter a place name.');
+      return;
+    }
+
+    const cached = getUserFromCache();
+    const userId = cached.user_id;
+    if (!userId) {
+      setFavError('User not logged in. Please sign in or register first.');
+      return;
+    }
+
+    setIsSavingFav(true);
+    setFavError(null);
+
+    try {
+      await addFavourite({
+        user_id: userId,
+        fav_name: name,
+        latitude: selectedPlace.lat,
+        longitude: selectedPlace.lon,
+      });
+
+      setIsSavingFav(false);
+      setShowFavModal(false);
+      setFavSuccess(true);
+      if (Platform.OS === 'web') {
+        window.alert(`"${name}" saved to favourite places! ⭐`);
+      } else {
+        Alert.alert('Saved! ⭐', `"${name}" has been added to your favourite places.`);
+      }
+      setTimeout(() => setFavSuccess(false), 3500);
+    } catch (err: any) {
+      setIsSavingFav(false);
+      setFavError(err.message || 'Failed to save favourite place.');
+    }
+  };
+
+  const renderFavModal = () => (
+    <Modal
+      visible={showFavModal}
+      animationType="fade"
+      transparent={true}
+      onRequestClose={() => setShowFavModal(false)}>
+      <View style={styles.favModalOverlay}>
+        <View
+          style={[
+            styles.favModalCard,
+            {
+              backgroundColor: isDark ? '#0f172a' : '#ffffff',
+              borderColor: isDark ? 'rgba(234, 179, 8, 0.35)' : 'rgba(0, 0, 0, 0.1)',
+            },
+          ]}>
+          <View style={styles.favModalHeaderRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 20 }}>⭐</Text>
+              <Text style={[styles.favModalTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                Add to Favourites
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowFavModal(false)} style={styles.favModalClose}>
+              <Text style={{ fontSize: 18, color: isDark ? '#94a3b8' : '#64748b' }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[styles.favModalLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+            Place Name:
+          </Text>
+          <TextInput
+            style={[
+              styles.favModalInput,
+              {
+                backgroundColor: isDark ? '#090d16' : '#f8fafc',
+                color: isDark ? '#f8fafc' : '#0f172a',
+                borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
+              },
+            ]}
+            placeholder="e.g. Home, Office, Gym, Campus..."
+            placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+            value={favNameInput}
+            onChangeText={setFavNameInput}
+            autoFocus
+          />
+
+          {selectedPlace && (
+            <View
+              style={[
+                styles.favCoordsBox,
+                { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9' },
+              ]}>
+              <Text style={[styles.favCoordsText, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                📍 Coordinates: {selectedPlace.lat.toFixed(5)}, {selectedPlace.lon.toFixed(5)}
+              </Text>
+            </View>
+          )}
+
+          {favError && <Text style={styles.favErrorText}>{favError}</Text>}
+
+          <View style={styles.favModalActionsRow}>
+            <TouchableOpacity
+              style={[
+                styles.favModalCancelBtn,
+                { borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1' },
+              ]}
+              onPress={() => setShowFavModal(false)}
+              disabled={isSavingFav}
+              activeOpacity={0.7}>
+              <Text style={[styles.favModalCancelText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.favModalAddBtn}
+              onPress={handleSaveFavourite}
+              disabled={isSavingFav}
+              activeOpacity={0.85}>
+              {isSavingFav ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={styles.favModalAddText}>Add</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   // 1. Place Selection Mode: User long-pressed on map or tapped POI
   if (selectedPlace && !isPreviewingDirections && !isNavigating) {
     return (
@@ -86,7 +254,7 @@ export function NavigationCard({
               borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
             },
           ]}>
-          {/* Header Row: Name & Close */}
+          {/* Header Row: Name, Star & Close */}
           <View style={styles.placeHeaderRow}>
             <View style={styles.placeTitleCol}>
               <Text numberOfLines={1} style={[styles.placeTitleText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
@@ -96,11 +264,33 @@ export function NavigationCard({
                 {distanceToSelectedPlace ? `${distanceToSelectedPlace} from your location` : `(${selectedPlace.lat.toFixed(4)}, ${selectedPlace.lon.toFixed(4)})`}
               </Text>
             </View>
-            <TouchableOpacity style={styles.dismissBtn} onPress={onDismissPlace} activeOpacity={0.7}>
-              <View style={[styles.dismissCircle, { backgroundColor: isDark ? '#334155' : '#e2e8f0' }]}>
-                <Text style={[styles.dismissBtnText, { color: isDark ? '#cbd5e1' : '#475569' }]}>✕</Text>
-              </View>
-            </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {/* Star Favourite Button */}
+              <TouchableOpacity
+                style={[
+                  styles.starBtn,
+                  {
+                    backgroundColor: favSuccess
+                      ? 'rgba(234, 179, 8, 0.25)'
+                      : isDark
+                      ? 'rgba(255, 255, 255, 0.08)'
+                      : '#f1f5f9',
+                    borderColor: favSuccess ? '#eab308' : isDark ? 'rgba(255, 255, 255, 0.15)' : '#cbd5e1',
+                  },
+                ]}
+                onPress={handleOpenFavModal}
+                activeOpacity={0.7}
+                accessibilityLabel="Add to favourites">
+                <Text style={{ fontSize: 16 }}>{favSuccess ? '⭐' : '☆'}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.dismissBtn} onPress={onDismissPlace} activeOpacity={0.7}>
+                <View style={[styles.dismissCircle, { backgroundColor: isDark ? '#334155' : '#e2e8f0' }]}>
+                  <Text style={[styles.dismissBtnText, { color: isDark ? '#cbd5e1' : '#475569' }]}>✕</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Guest Mode: Feature Locked Notification & Sign In Button */}
@@ -170,6 +360,7 @@ export function NavigationCard({
             </View>
           )}
         </View>
+        {renderFavModal()}
       </View>
     );
   }
@@ -186,7 +377,7 @@ export function NavigationCard({
               borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
             },
           ]}>
-          {/* Header Row: Back button, Destination Title & Close */}
+          {/* Header Row: Back button, Destination Title, Star & Close */}
           <View style={styles.previewHeaderRow}>
             <TouchableOpacity style={styles.backBtn} onPress={onBackFromDirections} activeOpacity={0.7}>
               <Text style={[styles.backBtnText, { color: isDark ? '#38bdf8' : '#0284c7' }]}>← Back</Text>
@@ -194,11 +385,33 @@ export function NavigationCard({
             <Text numberOfLines={1} style={[styles.previewTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
               {selectedPlace?.name || 'Destination'}
             </Text>
-            <TouchableOpacity style={styles.dismissBtn} onPress={onBackFromDirections} activeOpacity={0.7}>
-              <View style={[styles.dismissCircle, { backgroundColor: isDark ? '#334155' : '#e2e8f0' }]}>
-                <Text style={[styles.dismissBtnText, { color: isDark ? '#cbd5e1' : '#475569' }]}>✕</Text>
-              </View>
-            </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {/* Star Favourite Button */}
+              <TouchableOpacity
+                style={[
+                  styles.starBtn,
+                  {
+                    backgroundColor: favSuccess
+                      ? 'rgba(234, 179, 8, 0.25)'
+                      : isDark
+                      ? 'rgba(255, 255, 255, 0.08)'
+                      : '#f1f5f9',
+                    borderColor: favSuccess ? '#eab308' : isDark ? 'rgba(255, 255, 255, 0.15)' : '#cbd5e1',
+                  },
+                ]}
+                onPress={handleOpenFavModal}
+                activeOpacity={0.7}
+                accessibilityLabel="Add to favourites">
+                <Text style={{ fontSize: 16 }}>{favSuccess ? '⭐' : '☆'}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.dismissBtn} onPress={onBackFromDirections} activeOpacity={0.7}>
+                <View style={[styles.dismissCircle, { backgroundColor: isDark ? '#334155' : '#e2e8f0' }]}>
+                  <Text style={[styles.dismissBtnText, { color: isDark ? '#cbd5e1' : '#475569' }]}>✕</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Travel Mode Pills Row: Car, Bike, Walk */}
@@ -265,6 +478,7 @@ export function NavigationCard({
             <Text style={styles.bigNavStartText}>Start Navigation</Text>
           </TouchableOpacity>
         </View>
+        {renderFavModal()}
       </View>
     );
   }
@@ -523,6 +737,31 @@ export function NavigationCard({
               ]}>
               <Text style={[styles.barrierChipText, { color: '#10b981', fontWeight: '800' }]}>
                 🎯 {modelConfidence}% Conf
+              </Text>
+            </View>
+
+            {/* 5. Active Model Type */}
+            <View
+              style={[
+                styles.barrierChip,
+                {
+                  backgroundColor: activeBarriers.includes('WALK_MODEL_ACTIVE')
+                    ? 'rgba(245, 158, 11, 0.18)'
+                    : 'rgba(56, 189, 248, 0.15)',
+                  borderColor: activeBarriers.includes('WALK_MODEL_ACTIVE')
+                    ? '#f59e0b'
+                    : 'rgba(56, 189, 248, 0.3)',
+                },
+              ]}>
+              <Text
+                style={[
+                  styles.barrierChipText,
+                  {
+                    color: activeBarriers.includes('WALK_MODEL_ACTIVE') ? '#f59e0b' : '#38bdf8',
+                    fontWeight: '800',
+                  },
+                ]}>
+                {activeBarriers.includes('WALK_MODEL_ACTIVE') ? '🚶 Walk GRU' : '🚗 Vehicle Model'}
               </Text>
             </View>
           </View>
@@ -989,5 +1228,113 @@ const styles = StyleSheet.create({
   tunnelToggleText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+
+  // Star Favourite Button & Modal Styles
+  starBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  favModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    zIndex: 9999,
+  },
+  favModalCard: {
+    width: '100%',
+    maxWidth: 440,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    padding: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  favModalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  favModalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  favModalClose: {
+    padding: 6,
+  },
+  favModalLabel: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  favModalInput: {
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  favCoordsBox: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  favCoordsText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  favErrorText: {
+    color: '#ef4444',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  favModalActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  favModalCancelBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  favModalCancelText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  favModalAddBtn: {
+    flex: 1.2,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#eab308',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#eab308',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  favModalAddText: {
+    color: '#0f172a',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

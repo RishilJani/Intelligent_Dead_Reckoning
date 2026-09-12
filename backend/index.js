@@ -15,6 +15,13 @@ app.get('/', (req, res) => {
 
 app.use("/users", require("./controllers/userController"));
 app.use("/feedbacks", verifyToken, require("./controllers/feedbackController"));
+app.use("/favourites", (req, res, next) => {
+  const authHeader = req.headers["authorization"] || req.headers["Authorization"] || req.headers["x-access-token"];
+  if (authHeader) {
+    return verifyToken(req, res, next);
+  }
+  next();
+}, require("./controllers/favouriteController"));
 
 const PORT = process.env.PORT || 5000
 app.listen(PORT, () => {

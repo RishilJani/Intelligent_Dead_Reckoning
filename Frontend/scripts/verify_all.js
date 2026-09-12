@@ -276,4 +276,86 @@ if (smoothPoints[0] === 10.0 && smoothPoints[9] > 37.0) {
   process.exit(1);
 }
 
+// 9. Test Walking Speed Model
+console.log('\n--- Testing Walking Speed Model (GRU Architecture) ---');
+const walkingWeightsPath = path.join(__dirname, '..', 'assets', 'models', 'walking_speed_weights.json');
+if (!fs.existsSync(walkingWeightsPath)) {
+  console.error('FAIL: walking_speed_weights.json does not exist!');
+  process.exit(1);
+}
+const walkingData = JSON.parse(fs.readFileSync(walkingWeightsPath, 'utf8'));
+console.log('PASS: Loaded walking_speed_weights.json successfully.');
+console.log('  Model Source Checkpoint:', walkingData._meta.model.source_checkpoint);
+console.log('  Input Window Size:', walkingData._meta.model.window_size);
+console.log('  Features:', walkingData._meta.model.feature_columns.length, walkingData._meta.model.feature_columns);
+
+function stepGruCell(xt, hPrev, w_ih, w_hh, b_ih, b_hh) {
+  const hiddenSize = 48;
+  const inSize = xt.length;
+  const gi = new Float32Array(144);
+  const gh = new Float32Array(144);
+  for (let i = 0; i < 144; i++) {
+    let sum = b_ih[i];
+    const wRow = w_ih[i];
+    for (let j = 0; j < inSize; j++) sum += wRow[j] * xt[j];
+    gi[i] = sum;
+  }
+  for (let i = 0; i < 144; i++) {
+    let sum = b_hh[i];
+    const wRow = w_hh[i];
+    for (let j = 0; j < hiddenSize; j++) sum += wRow[j] * hPrev[j];
+    gh[i] = sum;
+  }
+  const hNext = new Float32Array(hiddenSize);
+  for (let i = 0; i < hiddenSize; i++) {
+    const r = sigmoid(gi[i] + gh[i]);
+    const z = sigmoid(gi[48 + i] + gh[48 + i]);
+    const n = tanh(gi[96 + i] + r * gh[96 + i]);
+    hNext[i] = (1 - z) * n + z * hPrev[i];
+  }
+  return hNext;
+}
+
+const wWeights = walkingData.weights;
+const wMeta = walkingData._meta.model;
+const dummyWalkingSeq = [];
+for (let t = 0; t < 10; t++) {
+  const vec = new Float32Array(9);
+  for (let f = 0; f < 9; f++) {
+    const rawVal = f === 2 || f === 6 ? 9.81 : 0.05;
+    vec[f] = (rawVal - wMeta.mean[f]) / wMeta.std[f];
+  }
+  dummyWalkingSeq.push(vec);
+}
+
+let hWalk = new Float32Array(48);
+for (let t = 0; t < 10; t++) {
+  hWalk = stepGruCell(
+    dummyWalkingSeq[t],
+    hWalk,
+    wWeights['rnn.weight_ih_l0'],
+    wWeights['rnn.weight_hh_l0'],
+    wWeights['rnn.bias_ih_l0'],
+    wWeights['rnn.bias_hh_l0']
+  );
+}
+const wH0 = wWeights['head.0.weight'];
+const bH0 = wWeights['head.0.bias'];
+const h0 = new Float32Array(24);
+for (let i = 0; i < 24; i++) {
+  let sum = bH0[i];
+  for (let j = 0; j < 48; j++) sum += wH0[i][j] * hWalk[j];
+  h0[i] = sum > 0 ? sum : 0;
+}
+let predMs = wWeights['head.2.bias'][0];
+for (let j = 0; j < 24; j++) predMs += wWeights['head.2.weight'][0][j] * h0[j];
+const speedKmh = Math.max(0, predMs) * 3.6;
+console.log(`Walking Speed Prediction: ${predMs.toFixed(3)} m/s (${speedKmh.toFixed(2)} km/h)`);
+if (predMs > 0.5 && predMs < 2.5) {
+  console.log('PASS: Walking model produces realistic human walking speed.');
+} else {
+  console.error('FAIL: Walking model speed out of range!', predMs);
+  process.exit(1);
+}
+
 console.log('\nALL VERIFICATION TESTS PASSED SUCCESSFULLY!');

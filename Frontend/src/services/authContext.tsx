@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import api from './api';
+import { saveUserToCache, getUserFromCache, clearUserCache } from './userCache';
 
 export interface User {
   id?: number | string;
   user_id?: number | string;
+  user_name?: string;
   username: string;
   email: string;
 }
@@ -64,21 +66,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Load any previously persisted session on mount
   useEffect(() => {
     try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const storedUser = window.localStorage.getItem(STORAGE_KEY_USER);
-        const storedToken = window.localStorage.getItem(STORAGE_KEY_TOKEN);
-        if (storedToken) {
-          setToken(storedToken);
-          api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-        }
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          if (storedToken && !parsedUser.user_id) {
-            parsedUser.user_id = extractUserIdFromToken(storedToken);
-          }
-          setUser(parsedUser);
-          setIsGuest(false);
-        }
+      const cached = getUserFromCache();
+      if (cached.token) {
+        setToken(cached.token);
+        api.defaults.headers.common['Authorization'] = `Bearer ${cached.token}`;
+      }
+      if (cached.user_id || cached.email || cached.username) {
+        const restoredUser: User = {
+          id: cached.user_id || undefined,
+          user_id: cached.user_id || (cached.token ? extractUserIdFromToken(cached.token) : undefined),
+          user_name: cached.user_name || undefined,
+          username: cached.user_name || cached.username || 'User',
+          email: cached.email || '',
+        };
+        setUser(restoredUser);
+        setIsGuest(false);
       }
     } catch (_e) {
       // Storage access error or non-browser environment
@@ -133,14 +135,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
         }
 
-        try {
-          if (typeof window !== 'undefined' && window.localStorage) {
-            window.localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser));
-            if (authToken) {
-              window.localStorage.setItem(STORAGE_KEY_TOKEN, authToken);
-            }
-          }
-        } catch (_e) { }
+        saveUserToCache(
+          {
+            user_id: resolvedUserId,
+            user_name: response.data.data?.user_name || trimmedUser,
+            username: response.data.data?.user_name || trimmedUser,
+            email: response.data.data?.email || trimmedEmail,
+            user_email: response.data.data?.email || trimmedEmail,
+          },
+          authToken
+        );
 
         return { success: true };
       } else {
@@ -175,11 +179,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.data && response.data.success) {
         const authToken = response.data.token || null;
         const resolvedUserId = response.data.data?.user_id || (authToken ? extractUserIdFromToken(authToken) : undefined);
+        const resolvedUserName = response.data.data?.user_name || trimmedEmail.split('@')[0];
+        const resolvedEmail = response.data.data?.email || trimmedEmail;
+
         const loggedInUser: User = {
           id: resolvedUserId,
           user_id: resolvedUserId,
-          username: response.data.data?.user_name || trimmedEmail.split('@')[0],
-          email: response.data.data?.email || trimmedEmail,
+          user_name: resolvedUserName,
+          username: resolvedUserName,
+          email: resolvedEmail,
         };
 
         setUser(loggedInUser);
@@ -190,14 +198,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
         }
 
-        try {
-          if (typeof window !== 'undefined' && window.localStorage) {
-            window.localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(loggedInUser));
-            if (authToken) {
-              window.localStorage.setItem(STORAGE_KEY_TOKEN, authToken);
-            }
-          }
-        } catch (_e) { }
+        saveUserToCache(
+          {
+            user_id: resolvedUserId,
+            user_name: resolvedUserName,
+            username: resolvedUserName,
+            email: resolvedEmail,
+            user_email: resolvedEmail,
+          },
+          authToken
+        );
 
         return { success: true };
       } else {
@@ -214,12 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     setIsGuest(true);
     delete api.defaults.headers.common['Authorization'];
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.removeItem(STORAGE_KEY_USER);
-        window.localStorage.removeItem(STORAGE_KEY_TOKEN);
-      }
-    } catch (_e) { }
+    clearUserCache();
   };
 
   const continueAsGuest = () => {

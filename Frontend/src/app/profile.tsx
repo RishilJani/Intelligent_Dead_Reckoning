@@ -212,6 +212,38 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Favourite Places Navigation */}
+        <View style={styles.sectionWrapper}>
+          <Text style={[styles.sectionHeading, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+            SAVED PLACES
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.horizontalSettingsBtn,
+              {
+                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : '#ffffff',
+                borderColor: isDark ? 'rgba(234, 179, 8, 0.35)' : 'rgba(202, 138, 4, 0.3)',
+              },
+            ]}
+            onPress={() => router.push('/favourites')}
+            activeOpacity={0.8}>
+            <View style={[styles.settingsBtnIconCircle, { backgroundColor: 'rgba(234, 179, 8, 0.15)' }]}>
+              <Text style={{ fontSize: 20 }}>⭐</Text>
+            </View>
+            <View style={styles.settingsBtnTextCol}>
+              <Text style={[styles.settingsBtnTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                Favourite Places
+              </Text>
+              <Text style={[styles.settingsBtnSub, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                View and manage saved destinations, home, work, and bookmarked pins
+              </Text>
+            </View>
+            <View style={[styles.settingsBtnArrowBadge, { backgroundColor: 'rgba(234, 179, 8, 0.18)' }]}>
+              <Text style={[styles.settingsBtnArrowText, { color: '#eab308' }]}>Open →</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
         {/* Feedback & Bug Reports Navigation */}
         <View style={styles.sectionWrapper}>
           <Text style={[styles.sectionHeading, { color: isDark ? '#38bdf8' : '#0284c7' }]}>

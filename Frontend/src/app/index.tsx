@@ -24,7 +24,12 @@ import {
 
 export default function NavigationScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ openSettings?: string }>();
+  const params = useLocalSearchParams<{
+    openSettings?: string;
+    destLat?: string;
+    destLon?: string;
+    destName?: string;
+  }>();
   const { user, isGuest, logout } = useAuth();
 
   const colorScheme = useColorScheme();
@@ -59,6 +64,13 @@ export default function NavigationScreen() {
   const [modelConfidence, setModelConfidence] = useState<number>(100);
   const [activeBarriers, setActiveBarriers] = useState<string[]>([]);
 
+  // Refs to preserve latest destination & costing for deferred route calculation on GPS fix
+  const endPointRef = useRef<LocationPoint | null>(null);
+  const activeCostingRef = useRef<CostingMode>('auto');
+  const hasInitialRoutedRef = useRef<boolean>(false);
+  const routeLoadingTimeoutRef = useRef<any>(null);
+  const lastProcessedDestRef = useRef<string>('');
+
   // Live Location Tracker Hook with continuous GPS streaming
   const {
     startPoint,
@@ -80,6 +92,12 @@ export default function NavigationScreen() {
         setAsStart: true,
       });
       deadReckoning.updateGpsPosition(coords.lat, coords.lon, coords.heading || 0, coords.speedKmh || 0, coords.accuracy || 8);
+
+      // If an endPoint was set from favourites before GPS was ready, calculate route ONCE
+      if (endPointRef.current && !hasInitialRoutedRef.current) {
+        hasInitialRoutedRef.current = true;
+        updateRoute(initialStart, endPointRef.current, activeCostingRef.current);
+      }
     }, [sendMapCommand, deadReckoning]),
     onLocationUpdate: useCallback((coords: LiveCoords) => {
       // Feed GPS reading into Dead Reckoning Engine
@@ -102,6 +120,10 @@ export default function NavigationScreen() {
 
   // Route Points & States
   const [endPoint, setEndPoint] = useState<LocationPoint | null>(null);
+  useEffect(() => {
+    endPointRef.current = endPoint;
+  }, [endPoint]);
+
   const [selectedPlace, setSelectedPlace] = useState<LocationPoint | null>(null);
   const [isPreviewingDirections, setIsPreviewingDirections] = useState<boolean>(false);
   const [mapClickTarget, setMapClickTarget] = useState<'start' | 'end'>('end');
@@ -186,6 +208,53 @@ export default function NavigationScreen() {
     });
   };
 
+  useEffect(() => {
+    activeCostingRef.current = activeCosting;
+  }, [activeCosting]);
+
+  // Handle incoming destination parameters from favourites screen
+  useEffect(() => {
+    if (!params?.destLat || !params?.destLon) return;
+
+    const destKey = `${params.destLat}_${params.destLon}_${params.destName || ''}`;
+    if (lastProcessedDestRef.current === destKey) {
+      return; // Already processed this destination query, prevent infinite loop!
+    }
+    lastProcessedDestRef.current = destKey;
+
+    const lat = parseFloat(params.destLat);
+    const lon = parseFloat(params.destLon);
+    if (isNaN(lat) || isNaN(lon)) return;
+
+    const destPoint: LocationPoint = {
+      lat,
+      lon,
+      name: params.destName || 'Favourite Place',
+    };
+    setSelectedPlace(destPoint);
+    setEndPoint(destPoint);
+    setIsPreviewingDirections(true);
+    sendMapCommand('PAN_TO_POINT', { lat, lon, zoom: 16 });
+
+    // Resolve current start point: prefer verified liveCoords or cached startPoint (avoid default Delhi)
+    const isDelhiPlaceholder = (p: { lat: number; lon: number } | null) =>
+      !p || (Math.abs(p.lat - 28.6139) < 0.001 && Math.abs(p.lon - 77.2090) < 0.001);
+
+    if (liveCoords && !isDelhiPlaceholder(liveCoords)) {
+      const activeStart: LocationPoint = {
+        lat: liveCoords.lat,
+        lon: liveCoords.lon,
+        name: '📍 Current Location',
+        isLiveLocation: true,
+      };
+      hasInitialRoutedRef.current = true;
+      updateRoute(activeStart, destPoint, activeCosting);
+    } else if (startPoint && !startPoint.isDefaultPlaceholder && !isDelhiPlaceholder(startPoint)) {
+      hasInitialRoutedRef.current = true;
+      updateRoute(startPoint, destPoint, activeCosting);
+    }
+  }, [params?.destLat, params?.destLon, params?.destName]);
+
   // Handle map incoming messages
   const handleMapMessage = useCallback(
     (eventData: any) => {
@@ -209,6 +278,9 @@ export default function NavigationScreen() {
         }
 
         if (data.type === 'ROUTE_UPDATED') {
+          if (routeLoadingTimeoutRef.current) {
+            clearTimeout(routeLoadingTimeoutRef.current);
+          }
           setRouteStats({
             distanceKm: Number(data.distanceKm || 0),
             durationMins: Number(data.durationMins || 0),
@@ -216,14 +288,18 @@ export default function NavigationScreen() {
             summary: data.summary || 'Route Calculated',
             engineMode: data.engineMode || 'Valhalla Online',
           });
-          if (data.startPoint) setStartPoint(data.startPoint);
-          if (data.endPoint) setEndPoint(data.endPoint);
           if (data.coords && Array.isArray(data.coords)) {
             deadReckoning.setActiveRoute(data.coords);
           }
           setIsLoadingRoute(false);
         } else if (data.type === 'ROUTE_LOADING') {
           setIsLoadingRoute(true);
+          if (routeLoadingTimeoutRef.current) {
+            clearTimeout(routeLoadingTimeoutRef.current);
+          }
+          routeLoadingTimeoutRef.current = setTimeout(() => {
+            setIsLoadingRoute(false);
+          }, 8000);
         } else if (data.type === 'NAV_COMPLETED') {
           setIsNavigating(false);
           setIsPreviewingDirections(false);
@@ -405,6 +481,7 @@ export default function NavigationScreen() {
   // User selects travel mode (car, bike, pedestrian) on directions preview
   const handleSelectCosting = (mode: CostingMode) => {
     setActiveCosting(mode);
+    deadReckoning.setCostingMode(mode);
     sendMapCommand('SET_COSTING', { costing: mode });
     const target = selectedPlace || endPoint;
     if (startPoint && target) {
@@ -423,6 +500,7 @@ export default function NavigationScreen() {
   // Travel Mode Selection
   const handleSelectTravelMode = (mode: CostingMode) => {
     setActiveCosting(mode);
+    deadReckoning.setCostingMode(mode);
     sendMapCommand('SET_COSTING', { costing: mode });
   };
 
@@ -437,6 +515,7 @@ export default function NavigationScreen() {
 
     if (nextNav) {
       setIsPreviewingDirections(false);
+      deadReckoning.setCostingMode(activeCosting);
       // Immediately prime Dead Reckoning with the latest GPS coordinate so it starts in GPS mode
       if (liveCoords) {
         deadReckoning.updateGpsPosition(

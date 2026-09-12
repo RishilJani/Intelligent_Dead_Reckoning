@@ -475,8 +475,23 @@ export function getMapHtml(): string {
     let lastNavCoords = null;
     let lastNavHeading = 0;
 
-    // Points
-    let startPoint = { lat: 28.6139, lon: 77.2090, name: 'Live GPS Location' };
+    // Points & Initial Center (prefer cached real location over hardcoded Delhi)
+    let cachedInitialLoc = null;
+    try {
+      const rawLoc = localStorage.getItem('nav_last_known_location');
+      if (rawLoc) {
+        cachedInitialLoc = JSON.parse(rawLoc);
+      }
+    } catch (e) {}
+
+    const defaultLat = cachedInitialLoc && typeof cachedInitialLoc.lat === 'number' ? cachedInitialLoc.lat : 28.6139;
+    const defaultLon = cachedInitialLoc && typeof cachedInitialLoc.lon === 'number' ? cachedInitialLoc.lon : 77.2090;
+
+    let startPoint = {
+      lat: defaultLat,
+      lon: defaultLon,
+      name: cachedInitialLoc ? 'Live GPS Location' : 'Locating GPS...'
+    };
     let endPoint = null;
 
     let startMarker = null;
@@ -496,7 +511,7 @@ export function getMapHtml(): string {
 
     // Initialize Leaflet Map
     const map = L.map('map', {
-      center: [28.6139, 77.2090],
+      center: [defaultLat, defaultLon],
       zoom: 15,
       zoomControl: true,
       layers: [currentTileLayer, poiMarkersGroup]
@@ -1556,7 +1571,18 @@ export function getMapHtml(): string {
       if (data.type === 'SET_INITIAL_VIEW') {
         map.setView([data.lat, data.lon], data.zoom || 15);
       } else if (data.type === 'SET_ROUTE_COORDS') {
-        startPoint = data.start;
+        let chosenStart = data.start;
+        // If data.start is the Delhi placeholder, but we already have a real GPS fix or cached fix, use real location
+        const isDelhiPlaceholder = chosenStart && Math.abs(chosenStart.lat - 28.6139) < 0.001 && Math.abs(chosenStart.lon - 77.2090) < 0.001;
+        if (isDelhiPlaceholder) {
+          if (liveGpsMarker) {
+            const pos = liveGpsMarker.getLatLng();
+            chosenStart = { lat: pos.lat, lon: pos.lng, name: 'Live GPS Location' };
+          } else if (cachedInitialLoc && cachedInitialLoc.lat && (Math.abs(cachedInitialLoc.lat - 28.6139) > 0.001 || Math.abs(cachedInitialLoc.lon - 77.2090) > 0.001)) {
+            chosenStart = { lat: cachedInitialLoc.lat, lon: cachedInitialLoc.lon, name: 'Live GPS Location' };
+          }
+        }
+        startPoint = chosenStart;
         endPoint = data.end;
         if (data.costing) currentCosting = data.costing;
         if (endPoint) clearSelectedPlacePin();
@@ -1580,6 +1606,13 @@ export function getMapHtml(): string {
         const acc = data.accuracy || 10;
         const heading = data.heading || 0;
         const speedKmh = data.speedKmh || 0;
+
+        // Persist real GPS location to localStorage inside map
+        if (Math.abs(lat - 28.6139) > 0.001 || Math.abs(lon - 77.2090) > 0.001) {
+          try {
+            localStorage.setItem('nav_last_known_location', JSON.stringify({ lat, lon, accuracy: acc, heading, speedKmh }));
+          } catch(e) {}
+        }
 
         const gpsReadoutEl = document.getElementById('gps-status-readout');
         if (gpsReadoutEl) gpsReadoutEl.innerText = 'GPS: ' + lat.toFixed(4) + ', ' + lon.toFixed(4) + ' (±' + Math.round(acc) + 'm)';
