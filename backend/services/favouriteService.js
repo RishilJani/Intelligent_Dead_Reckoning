@@ -63,7 +63,7 @@ async function addFavouritePlace(req, res) {
 }
 
 // remove favourite place of user
-async function deleteFavourite(req, res) {
+async function deleteFavouritePlace(req, res) {
     const { fav_id } = req.params;
     if (!fav_id || isNaN(fav_id)) {
         return res.status(400).json({ message: "Favourite id is not valid" });
@@ -81,4 +81,4 @@ async function deleteFavourite(req, res) {
     }
 }
 
-module.exports = { getAllFavPlaces, getAllFavPlacesByUserId, addFavouritePlace };
+module.exports = { getAllFavPlaces, getAllFavPlacesByUserId, addFavouritePlace , deleteFavouritePlace };

@@ -1,5 +1,4 @@
-const { getAllFavPlaces, getAllFavPlacesByUserId, addFavouritePlace } = require("../services/favouriteService");
-const { deleteFeedback } = require("../services/feedbackService");
+const { getAllFavPlaces, getAllFavPlacesByUserId, addFavouritePlace,deleteFavouritePlace} = require("../services/favouriteService");
 
 const router = require("express").Router();
 
@@ -9,6 +8,6 @@ router.get("/:user_id", getAllFavPlacesByUserId);
 
 router.post("/", addFavouritePlace);
 
-router.delete("/:fav_id", deleteFeedback);
+router.delete("/:fav_id", deleteFavouritePlace);
 
 module.exports = router;
