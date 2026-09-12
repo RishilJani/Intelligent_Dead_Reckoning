@@ -1,5 +1,4 @@
 const express = require('express');
-const supabase = require('../supabase');
 const router = express.Router();
 const { getAllUsers, getByUserId, addUser, deleteUser, updateUser, login } = require("../services/userService");
 

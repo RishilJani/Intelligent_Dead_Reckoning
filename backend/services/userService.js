@@ -109,6 +109,7 @@ async function updateUser(req, res) {
     }
 }
 
+// login user
 async function login(req, res) {
     const { email, password } = req.body;
     if (!email || !password) {
