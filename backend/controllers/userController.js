@@ -1,18 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const { getAllUsers, getByUserId, addUser, deleteUser, updateUser, login } = require("../services/userService");
+const { verifyToken } = require("../middleware/authMiddleware");
 
-// get all users
-router.get("/", getAllUsers);
+// Public routes
+router.post("/login", login);
+router.post("/signup", addUser);
 
-router.get("/login", login);
-
-router.get("/:user_id", getByUserId);
-
-router.post("/", addUser);
-
-router.delete("/:user_id", deleteUser);
-
-router.put("/:user_id", updateUser);
+// Protected routes (require JWT token)
+router.get("/", verifyToken, getAllUsers);
+router.get("/:user_id", verifyToken, getByUserId);
+router.delete("/:user_id", verifyToken, deleteUser);
+router.put("/:user_id", verifyToken, updateUser);
 
 module.exports = router;

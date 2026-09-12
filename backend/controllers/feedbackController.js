@@ -5,8 +5,6 @@ const router = require('express').Router();
 router.get("/", getAllFeedbacks);
 
 // get by user_id 
-router.get("/login", login);
-
 router.get("/:user_id", getFeedbacksByUserId);
 
 router.post("/", addFeedback);
