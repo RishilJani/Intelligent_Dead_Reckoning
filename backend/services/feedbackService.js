@@ -41,7 +41,7 @@ async function getFeedbacksByUserId(req, res) {
             return res.status(404).json({ message: error.message });
         }
         if (data.length > 0) {
-            return res.status(200).json(data[0]);
+            return res.status(200).json(data);
         } else {
             return res.status(404).json({ message: "No Record Found" });
         }
@@ -105,10 +105,10 @@ async function updateFeedback(req, res) {
         return res.status(400).json({ message: "Invalid Feedback id" });
     }
     const { feedback_text, is_bug } = req.body;
-    const updated_date = new Date();
+    const updated_at = new Date();
     try {
         const { data, error } = await supabase.from(FEEDBACKS_TBL).update(
-            { feedback_text, is_bug, updated_date }
+            { feedback_text, is_bug, updated_at }
         ).eq(FEEDBACK_ID, feedback_id).select();
 
         if (error) {
