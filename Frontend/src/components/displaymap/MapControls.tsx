@@ -3,133 +3,52 @@ import { StyleSheet, View, Text, TouchableOpacity, useColorScheme } from 'react-
 
 interface MapControlsProps {
   isLiveTracking: boolean;
-  is3DMode: boolean;
-  isOfflineMode: boolean;
-  showSettings: boolean;
   onCenterGPS: () => void;
-  onToggle3D: () => void;
-  onToggleOffline: () => void;
-  onToggleSettings: () => void;
+  bottomOffset?: number;
 }
 
 export function MapControls({
   isLiveTracking,
-  is3DMode,
-  isOfflineMode,
-  showSettings,
   onCenterGPS,
-  onToggle3D,
-  onToggleOffline,
-  onToggleSettings,
+  bottomOffset = 24,
 }: MapControlsProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
   return (
     <View style={styles.floatingControlsContainer} pointerEvents="box-none">
-      {/* Top Status & Controls */}
-      <View style={styles.topBarRow} pointerEvents="box-none">
-        {/* Offline / Live Status Indicator Pill */}
-        <TouchableOpacity
-          style={[
-            styles.statusPill,
-            {
-              backgroundColor: isDark ? 'rgba(15, 23, 42, 0.88)' : 'rgba(255, 255, 255, 0.92)',
-              borderColor: isOfflineMode ? 'rgba(245, 158, 11, 0.4)' : 'rgba(34, 197, 94, 0.4)',
-            },
-          ]}
-          onPress={onToggleOffline}
-          activeOpacity={0.8}>
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: isOfflineMode ? '#f59e0b' : '#22c55e' },
-            ]}
-          />
-          <Text
-            style={[
-              styles.statusPillText,
-              { color: isOfflineMode ? '#f59e0b' : '#10b981' },
-            ]}>
-            {isOfflineMode ? '⚡ Offline Engine' : '🟢 Valhalla Live'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Action Buttons (Settings) */}
-        <View style={styles.rightButtonsRow} pointerEvents="box-none">
-          <TouchableOpacity
-            style={[
-              styles.controlBtn,
-              {
-                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.94)',
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
-              },
-            ]}
-            onPress={onToggleSettings}
-            activeOpacity={0.75}
-            accessibilityLabel="Map Settings & Layers">
-            <Text style={styles.controlBtnIcon}>{showSettings ? '✕' : '⚙️'}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Floating Vertical Actions on Map Right Side */}
-      <View style={styles.sideControlsGroup} pointerEvents="box-none">
-        {/* Re-center Live GPS */}
+      {/* Re-center Live GPS at Bottom Right, shifting upwards dynamically when bottom card appears */}
+      <View
+        style={[
+          styles.reLocateContainer,
+          {
+            bottom: bottomOffset,
+          },
+        ]}
+        pointerEvents="box-none">
         <TouchableOpacity
           style={[
             styles.controlBtn,
-            styles.sideBtn,
+            styles.reLocateBtn,
             isLiveTracking && styles.activeGpsBtn,
             {
               backgroundColor: isLiveTracking
                 ? '#0284c7'
                 : isDark
-                ? 'rgba(15, 23, 42, 0.9)'
-                : 'rgba(255, 255, 255, 0.94)',
+                ? 'rgba(15, 23, 42, 0.95)'
+                : '#ffffff',
               borderColor: isLiveTracking
                 ? '#38bdf8'
                 : isDark
-                ? 'rgba(255, 255, 255, 0.15)'
+                ? 'rgba(255, 255, 255, 0.16)'
                 : 'rgba(0, 0, 0, 0.1)',
             },
           ]}
           onPress={onCenterGPS}
           activeOpacity={0.8}
-          accessibilityLabel="Re-center GPS">
-          <Text style={[styles.sideBtnText, isLiveTracking && { color: '#ffffff' }]}>
+          accessibilityLabel="Re-locate to Current GPS">
+          <Text style={[styles.reLocateIcon, isLiveTracking && { color: '#ffffff' }]}>
             🎯
-          </Text>
-        </TouchableOpacity>
-
-        {/* 3D POV Toggle */}
-        <TouchableOpacity
-          style={[
-            styles.controlBtn,
-            styles.sideBtn,
-            is3DMode && styles.active3DBtn,
-            {
-              backgroundColor: is3DMode
-                ? '#0284c7'
-                : isDark
-                ? 'rgba(15, 23, 42, 0.9)'
-                : 'rgba(255, 255, 255, 0.94)',
-              borderColor: is3DMode
-                ? '#38bdf8'
-                : isDark
-                ? 'rgba(255, 255, 255, 0.15)'
-                : 'rgba(0, 0, 0, 0.1)',
-            },
-          ]}
-          onPress={onToggle3D}
-          activeOpacity={0.8}
-          accessibilityLabel="Toggle 3D View">
-          <Text
-            style={[
-              styles.sideBtn3dText,
-              { color: is3DMode ? '#ffffff' : isDark ? '#cbd5e1' : '#334155' },
-            ]}>
-            3D
           </Text>
         </TouchableOpacity>
       </View>
@@ -144,89 +63,37 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 15,
+    zIndex: 25,
   },
-  topBarRow: {
+  reLocateContainer: {
     position: 'absolute',
-    top: 54,
-    left: 16,
     right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    zIndex: 20,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  statusPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  rightButtonsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+    zIndex: 25,
+    transitionProperty: 'bottom',
+    transitionDuration: '0.3s',
+  } as any,
   controlBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.22,
-    shadowRadius: 6,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 7,
   },
-  controlBtnIcon: {
-    fontSize: 16,
-  },
-  sideControlsGroup: {
-    position: 'absolute',
-    right: 14,
-    bottom: 120,
-    gap: 10,
-    zIndex: 20,
-  },
-  sideBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  reLocateBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   activeGpsBtn: {
     shadowColor: '#0284c7',
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 9,
   },
-  active3DBtn: {
-    shadowColor: '#0284c7',
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-  },
-  sideBtnText: {
-    fontSize: 18,
-  },
-  sideBtn3dText: {
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+  reLocateIcon: {
+    fontSize: 22,
   },
 });

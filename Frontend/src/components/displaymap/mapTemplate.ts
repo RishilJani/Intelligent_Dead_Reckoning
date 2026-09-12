@@ -161,48 +161,7 @@ export function getMapHtml(): string {
       cursor: pointer;
     }
 
-    /* Map HUD Info Overlay */
-    .map-hud {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 1000;
-      background: rgba(15, 23, 42, 0.9);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 10px;
-      padding: 6px 10px;
-      color: #f8fafc;
-      font-size: 10.5px;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-    }
-    .hud-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      color: #38bdf8;
-      font-weight: 700;
-    }
-    .hud-dot {
-      width: 8px;
-      height: 8px;
-      background-color: #22c55e;
-      border-radius: 50%;
-      box-shadow: 0 0 8px #22c55e;
-    }
-    .hud-dot.offline {
-      background-color: #f59e0b;
-      box-shadow: 0 0 8px #f59e0b;
-    }
-    .hud-tile-info {
-      color: #94a3b8;
-      font-family: monospace;
-      font-size: 9.5px;
-    }
+
 
     /* Live Speedometer HUD */
     .speedometer-hud {
@@ -224,6 +183,51 @@ export function getMapHtml(): string {
     }
     .speed-val { font-size: 20px; font-weight: 900; color: #38bdf8; line-height: 1; }
     .speed-unit { font-size: 8.5px; color: #94a3b8; font-weight: 700; }
+
+    /* Google Maps Animated Dotted Line & Road Start Node */
+    .gmaps-dotted-line {
+      stroke-dasharray: 2, 10 !important;
+      stroke-linecap: round !important;
+      animation: dash-march 1.2s linear infinite;
+    }
+    @keyframes dash-march {
+      to {
+        stroke-dashoffset: -12;
+      }
+    }
+    .road-start-node {
+      width: 14px;
+      height: 14px;
+      background: #38bdf8;
+      border: 2.5px solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.95);
+    }
+
+    /* Google Maps Dropped Pin */
+    .selected-place-pin {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: pin-drop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes pin-drop {
+      0% { transform: translateY(-26px); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+    .pin-head-icon {
+      font-size: 34px;
+      line-height: 1;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+    }
+    .pin-shadow {
+      width: 14px;
+      height: 5px;
+      background: rgba(0,0,0,0.35);
+      border-radius: 50%;
+      margin-top: -3px;
+    }
   </style>
 </head>
 <body>
@@ -231,14 +235,6 @@ export function getMapHtml(): string {
     <div id="map"></div>
   </div>
 
-  <div class="map-hud">
-    <div class="hud-badge">
-      <span class="hud-dot" id="engine-status-dot"></span>
-      <span id="engine-status-text">Valhalla Online Engine</span>
-    </div>
-    <div class="hud-tile-info" id="valhalla-tile-readout">OSM Data: Live Global</div>
-    <div class="hud-tile-info" id="gps-status-readout">GPS: Acquiring...</div>
-  </div>
 
   <div class="speedometer-hud" id="speedometer">
     <span class="speed-val" id="speed-display">0</span>
@@ -490,6 +486,10 @@ export function getMapHtml(): string {
     let poiMarkersGroup = L.layerGroup();
     let routePolyline = null;
     let routePolylineGlow = null;
+    let dottedPolyline = null;
+    let dottedPolylineGlow = null;
+    let routeStartNodeMarker = null;
+    let hasJoinedRoadRoute = false;
     let vehicleMarker = null;
     let currentRouteCoords = [];
     let currentManeuversList = [];
@@ -556,6 +556,92 @@ export function getMapHtml(): string {
       });
     }
 
+    function createRoadStartNodeIcon() {
+      return L.divIcon({
+        className: '',
+        html: '<div class="road-start-node" title="Road Route Start"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+    }
+
+    function createSelectedPinIcon() {
+      return L.divIcon({
+        className: '',
+        html: '<div class="selected-place-pin"><span class="pin-head-icon">📍</span><div class="pin-shadow"></div></div>',
+        iconSize: [36, 40],
+        iconAnchor: [18, 38],
+        popupAnchor: [0, -38]
+      });
+    }
+
+    function clearDottedConnector() {
+      if (dottedPolyline) {
+        map.removeLayer(dottedPolyline);
+        dottedPolyline = null;
+      }
+      if (dottedPolylineGlow) {
+        map.removeLayer(dottedPolylineGlow);
+        dottedPolylineGlow = null;
+      }
+      if (routeStartNodeMarker) {
+        map.removeLayer(routeStartNodeMarker);
+        routeStartNodeMarker = null;
+      }
+    }
+
+    function setOrUpdateDottedConnector(fromCoords, toCoords) {
+      if (!fromCoords || !toCoords) {
+        clearDottedConnector();
+        return;
+      }
+      const pts = [fromCoords, toCoords];
+      if (dottedPolyline && dottedPolylineGlow && routeStartNodeMarker) {
+        dottedPolyline.setLatLngs(pts);
+        dottedPolylineGlow.setLatLngs(pts);
+        routeStartNodeMarker.setLatLng(toCoords);
+      } else {
+        clearDottedConnector();
+        dottedPolylineGlow = L.polyline(pts, {
+          color: '#0284c7',
+          weight: 9,
+          opacity: 0.45,
+          lineCap: 'round',
+          dashArray: '2, 10',
+          className: 'gmaps-dotted-line'
+        }).addTo(map);
+
+        dottedPolyline = L.polyline(pts, {
+          color: '#38bdf8',
+          weight: 5.5,
+          opacity: 0.95,
+          lineCap: 'round',
+          dashArray: '2, 10',
+          className: 'gmaps-dotted-line'
+        }).addTo(map);
+
+        routeStartNodeMarker = L.marker(toCoords, {
+          icon: createRoadStartNodeIcon(),
+          zIndexOffset: 850
+        }).addTo(map);
+      }
+    }
+
+    function calculateBearing(lat1, lon1, lat2, lon2) {
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
+      const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+                Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
+      const brng = Math.atan2(y, x) * 180 / Math.PI;
+      return (brng + 360) % 360;
+    }
+
+    function getDistanceToRouteInMeters(lat, lon, routeCoords) {
+      if (!routeCoords || routeCoords.length === 0) return Infinity;
+      const snapped = projectPointToRoute(lat, lon, routeCoords);
+      return getDistanceFromLatLonInKm(lat, lon, snapped.lat, snapped.lon) * 1000;
+    }
+
     async function fetchReverseName(lat, lon) {
       try {
         const res = await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon + '&zoom=18', {
@@ -609,22 +695,90 @@ export function getMapHtml(): string {
       }
     }
 
-    // Map Tap sets Start or Destination
-    map.on('click', async function(e) {
-      if (isRealNavigating) return;
-      const lat = e.latlng.lat;
-      const lon = e.latlng.lng;
-      const name = await fetchReverseName(lat, lon);
+    let selectedPlaceMarker = null;
 
-      if (clickTargetMode === 'start') {
-        startPoint = { lat, lon, name };
-        notifyParent('POINT_DRAGGED', { target: 'start', lat, lon, name });
-      } else {
-        endPoint = { lat, lon, name };
-        notifyParent('POINT_DRAGGED', { target: 'end', lat, lon, name });
+    async function triggerPlaceSelection(lat, lon, knownName, category, address) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(40); } catch(e) {}
       }
-      renderMarkers();
-      if (startPoint && endPoint) calculateRoute();
+
+      if (selectedPlaceMarker) {
+        map.removeLayer(selectedPlaceMarker);
+        selectedPlaceMarker = null;
+      }
+
+      selectedPlaceMarker = L.marker([lat, lon], {
+        icon: createSelectedPinIcon(),
+        zIndexOffset: 950
+      }).addTo(map);
+
+      const name = knownName || await fetchReverseName(lat, lon);
+
+      notifyParent('PLACE_SELECTED', {
+        lat: lat,
+        lon: lon,
+        name: name,
+        category: category,
+        address: address
+      });
+    }
+
+    function clearSelectedPlacePin() {
+      if (selectedPlaceMarker) {
+        map.removeLayer(selectedPlaceMarker);
+        selectedPlaceMarker = null;
+      }
+    }
+
+    // Normal Map Tap: does NOT set end point directly
+    map.on('click', function(e) {
+      if (isRealNavigating) return;
+      notifyParent('MAP_CLICKED', {});
+    });
+
+    // 1.5 - 2s Long Press Detector on Map Screen
+    let longPressTimer = null;
+    let touchStartClient = null;
+    let touchStartLatLng = null;
+
+    function handleLongPressTrigger() {
+      if (touchStartLatLng && !isRealNavigating) {
+        triggerPlaceSelection(touchStartLatLng.lat, touchStartLatLng.lng);
+      }
+      longPressTimer = null;
+    }
+
+    map.on('mousedown touchstart', function(e) {
+      if (isRealNavigating) return;
+      const ev = e.originalEvent;
+      touchStartClient = ev.touches ? { x: ev.touches[0].clientX, y: ev.touches[0].clientY } : { x: ev.clientX, y: ev.clientY };
+      touchStartLatLng = e.latlng;
+
+      if (longPressTimer) clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(handleLongPressTrigger, 1500);
+    });
+
+    map.on('mousemove touchmove', function(e) {
+      if (!longPressTimer || !touchStartClient) return;
+      const ev = e.originalEvent;
+      const cur = ev.touches ? { x: ev.touches[0].clientX, y: ev.touches[0].clientY } : { x: ev.clientX, y: ev.clientY };
+      const dist = Math.hypot(cur.x - touchStartClient.x, cur.y - touchStartClient.y);
+      if (dist > 12) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    });
+
+    map.on('mouseup touchend touchcancel dragstart zoomstart', function() {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    });
+
+    map.on('contextmenu', function(e) {
+      if (isRealNavigating) return;
+      triggerPlaceSelection(e.latlng.lat, e.latlng.lng);
     });
 
     // -------------------------------------------------------------
@@ -736,14 +890,14 @@ export function getMapHtml(): string {
           const current = openSet.shift();
 
           if (current === endNodeId) {
-            // Reconstruct route path
+            // Reconstruct route path starting at the road node
             const pathCoords = [];
             let curr = current;
             while (curr) {
               pathCoords.unshift([nodes[curr].lat, nodes[curr].lon]);
               curr = cameFrom[curr];
             }
-            pathCoords.unshift([p1.lat, p1.lon]);
+            // Offline road route starts at the road node to allow dotted connector when off-road
             pathCoords.push([p2.lat, p2.lon]);
 
             let totalKm = 0;
@@ -888,28 +1042,70 @@ export function getMapHtml(): string {
       }
 
       const isOff = routeResult.engineMode.includes('Offline') || routeResult.engineMode.includes('Cached');
-      document.getElementById('engine-status-dot').className = isOff ? 'hud-dot offline' : 'hud-dot';
-      document.getElementById('engine-status-text').innerText = routeResult.engineMode;
+      const dotEl = document.getElementById('engine-status-dot');
+      if (dotEl) dotEl.className = isOff ? 'hud-dot offline' : 'hud-dot';
+      const textEl = document.getElementById('engine-status-text');
+      if (textEl) textEl.innerText = routeResult.engineMode;
 
       drawRoute(routeResult);
     }
 
     function drawRoute(res) {
       currentRouteCoords = res.coords;
-      currentManeuversList = res.maneuvers;
+      currentManeuversList = res.maneuvers ? [...res.maneuvers] : [];
 
       if (routePolyline) map.removeLayer(routePolyline);
       if (routePolylineGlow) map.removeLayer(routePolylineGlow);
+      clearDottedConnector();
 
       routePolylineGlow = L.polyline(res.coords, { color: '#0284c7', weight: 9, opacity: 0.4, lineCap: 'round', lineJoin: 'round' }).addTo(map);
       routePolyline = L.polyline(res.coords, { color: '#38bdf8', weight: 5.5, opacity: 0.95, lineCap: 'round', lineJoin: 'round', dashArray: currentCosting === 'pedestrian' ? '6, 8' : undefined }).addTo(map);
 
-      map.fitBounds(L.latLngBounds(res.coords), { padding: [50, 50], maxZoom: 16 });
+      const roadStart = (res.coords && res.coords.length > 0) ? res.coords[0] : null;
+      let offRoadDistM = 0;
+      let offRoadDistKm = 0;
+      let totalDistanceKm = Number(res.distanceKm || 0);
+      let totalDurationMins = Number(res.durationMins || 0);
+
+      if (startPoint && roadStart) {
+        offRoadDistKm = getDistanceFromLatLonInKm(startPoint.lat, startPoint.lon, roadStart[0], roadStart[1]);
+        offRoadDistM = offRoadDistKm * 1000;
+      }
+
+      if (offRoadDistM > 10 && offRoadDistM <= 500 && startPoint && roadStart) {
+        hasJoinedRoadRoute = false;
+        setOrUpdateDottedConnector([startPoint.lat, startPoint.lon], roadStart);
+
+        const walkDistStr = Math.round(offRoadDistM) + ' m';
+        const offRoadManeuver = {
+          instruction: 'Head towards starting point on the road (' + walkDistStr + ')',
+          distance: walkDistStr,
+          icon: '🚶'
+        };
+
+        if (currentManeuversList.length === 0 || !currentManeuversList[0].instruction.startsWith('Head towards starting point')) {
+          currentManeuversList.unshift(offRoadManeuver);
+        }
+
+        totalDistanceKm += offRoadDistKm;
+        totalDurationMins += Math.max(1, Math.round((offRoadDistKm / 4.5) * 60));
+
+        const boundsCoords = [[startPoint.lat, startPoint.lon], ...res.coords];
+        map.fitBounds(L.latLngBounds(boundsCoords), { padding: [50, 50], maxZoom: 16 });
+      } else {
+        if (offRoadDistM <= 10) {
+          hasJoinedRoadRoute = true;
+        } else {
+          hasJoinedRoadRoute = false;
+        }
+        clearDottedConnector();
+        map.fitBounds(L.latLngBounds(res.coords), { padding: [50, 50], maxZoom: 16 });
+      }
 
       notifyParent('ROUTE_UPDATED', {
-        distanceKm: res.distanceKm.toFixed(1),
-        durationMins: res.durationMins,
-        maneuvers: res.maneuvers,
+        distanceKm: totalDistanceKm.toFixed(1),
+        durationMins: totalDurationMins,
+        maneuvers: currentManeuversList,
         summary: res.engineMode,
         engineMode: res.engineMode,
         startPoint: startPoint,
@@ -934,6 +1130,19 @@ export function getMapHtml(): string {
     function calculateRemainingDistance(currentLat, currentLon) {
       if (!currentRouteCoords || currentRouteCoords.length === 0) return 0;
       
+      if (!hasJoinedRoadRoute) {
+        const roadStart = currentRouteCoords[0];
+        const offRoadKm = getDistanceFromLatLonInKm(currentLat, currentLon, roadStart[0], roadStart[1]);
+        let roadTotal = 0;
+        for (let j = 0; j < currentRouteCoords.length - 1; j++) {
+          roadTotal += getDistanceFromLatLonInKm(
+            currentRouteCoords[j][0], currentRouteCoords[j][1],
+            currentRouteCoords[j+1][0], currentRouteCoords[j+1][1]
+          );
+        }
+        return offRoadKm + roadTotal;
+      }
+
       let minIdx = 0;
       let minDist = Infinity;
       for (let i = 0; i < currentRouteCoords.length; i++) {
@@ -960,15 +1169,46 @@ export function getMapHtml(): string {
       document.getElementById('speedometer').style.display = 'flex';
 
       const initialPos = lastNavCoords || (startPoint ? [startPoint.lat, startPoint.lon] : [28.6139, 77.2090]);
-      
-      if (!vehicleMarker) {
-        vehicleMarker = L.marker(initialPos, { icon: createVehicleIcon(lastNavHeading || 0), zIndexOffset: 1000 }).addTo(map);
-      } else {
-        vehicleMarker.setLatLng(initialPos);
+      let initialDisplayPos = initialPos;
+
+      if (currentRouteCoords && currentRouteCoords.length > 0) {
+        const roadStart = currentRouteCoords[0];
+        const distToRoadStartM = getDistanceFromLatLonInKm(initialPos[0], initialPos[1], roadStart[0], roadStart[1]) * 1000;
+        const distToRouteM = getDistanceToRouteInMeters(initialPos[0], initialPos[1], currentRouteCoords);
+
+        if (distToRoadStartM <= 15 || distToRouteM <= 20) {
+          hasJoinedRoadRoute = true;
+          clearDottedConnector();
+          const snapped = projectPointToRoute(initialPos[0], initialPos[1], currentRouteCoords);
+          initialDisplayPos = [snapped.lat, snapped.lon];
+        } else {
+          hasJoinedRoadRoute = false;
+          initialDisplayPos = initialPos;
+          if (distToRoadStartM <= 500) {
+            setOrUpdateDottedConnector(initialPos, roadStart);
+            if (!lastNavHeading) {
+              lastNavHeading = calculateBearing(initialPos[0], initialPos[1], roadStart[0], roadStart[1]);
+            }
+          } else {
+            clearDottedConnector();
+          }
+        }
       }
 
-      map.setView(initialPos, 17, { animate: true });
-      speakText('Starting live navigation. Follow the route.');
+      if (!vehicleMarker) {
+        vehicleMarker = L.marker(initialDisplayPos, { icon: createVehicleIcon(lastNavHeading || 0), zIndexOffset: 1000 }).addTo(map);
+      } else {
+        vehicleMarker.setLatLng(initialDisplayPos);
+        vehicleMarker.setIcon(createVehicleIcon(lastNavHeading || 0));
+      }
+
+      map.setView(initialDisplayPos, 17, { animate: true });
+
+      if (!hasJoinedRoadRoute && currentRouteCoords && currentRouteCoords.length > 0) {
+        speakText('Starting navigation. Head towards the starting point on the road.');
+      } else {
+        speakText('Starting live navigation. Follow the route.');
+      }
     }
 
     function stopRealNavigation() {
@@ -979,6 +1219,18 @@ export function getMapHtml(): string {
       }
       document.getElementById('speedometer').style.display = 'none';
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
+      // Restore preview dotted connector if route is still active and user started off-road
+      if (currentRouteCoords && currentRouteCoords.length > 0 && startPoint) {
+        const roadStart = currentRouteCoords[0];
+        const d = getDistanceFromLatLonInKm(startPoint.lat, startPoint.lon, roadStart[0], roadStart[1]) * 1000;
+        if (d > 10 && d <= 500) {
+          hasJoinedRoadRoute = false;
+          setOrUpdateDottedConnector([startPoint.lat, startPoint.lon], roadStart);
+        } else {
+          clearDottedConnector();
+        }
+      }
     }
 
     function projectPointToRoute(lat, lon, routeCoords) {
@@ -1013,13 +1265,44 @@ export function getMapHtml(): string {
     }
 
     function updateRealNavLocation(lat, lon, accuracy, heading, speedKmh) {
-      // Snap marker strictly onto the route path if active route exists
       let displayLat = lat;
       let displayLon = lon;
-      if (currentRouteCoords && currentRouteCoords.length > 1) {
-        const snapped = projectPointToRoute(lat, lon, currentRouteCoords);
-        displayLat = snapped.lat;
-        displayLon = snapped.lon;
+
+      if (currentRouteCoords && currentRouteCoords.length > 0) {
+        const roadStart = currentRouteCoords[0];
+        const distToRoadStartM = getDistanceFromLatLonInKm(lat, lon, roadStart[0], roadStart[1]) * 1000;
+        const distToRouteM = getDistanceToRouteInMeters(lat, lon, currentRouteCoords);
+
+        if (!hasJoinedRoadRoute) {
+          if (distToRoadStartM <= 15 || distToRouteM <= 20) {
+            hasJoinedRoadRoute = true;
+            clearDottedConnector();
+            if (isRealNavigating) {
+              speakText('Joined route. Follow the road.');
+            }
+            const snapped = projectPointToRoute(lat, lon, currentRouteCoords);
+            displayLat = snapped.lat;
+            displayLon = snapped.lon;
+          } else {
+            // Still off-road: stay at actual GPS position
+            displayLat = lat;
+            displayLon = lon;
+
+            if (distToRoadStartM <= 500) {
+              setOrUpdateDottedConnector([lat, lon], roadStart);
+              if (heading == null || heading === 0) {
+                lastNavHeading = calculateBearing(lat, lon, roadStart[0], roadStart[1]);
+              }
+            } else {
+              clearDottedConnector();
+            }
+          }
+        } else {
+          // Already joined road route: snap to route
+          const snapped = projectPointToRoute(lat, lon, currentRouteCoords);
+          displayLat = snapped.lat;
+          displayLon = snapped.lon;
+        }
       }
 
       lastNavCoords = [displayLat, displayLon];
@@ -1276,8 +1559,19 @@ export function getMapHtml(): string {
         startPoint = data.start;
         endPoint = data.end;
         if (data.costing) currentCosting = data.costing;
+        if (endPoint) clearSelectedPlacePin();
         renderMarkers();
-        calculateRoute();
+        if (startPoint && endPoint) {
+          calculateRoute();
+        } else {
+          if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
+          if (routePolylineGlow) { map.removeLayer(routePolylineGlow); routePolylineGlow = null; }
+          clearDottedConnector();
+          currentRouteCoords = [];
+          currentManeuversList = [];
+        }
+      } else if (data.type === 'CLEAR_SELECTED_PLACE') {
+        clearSelectedPlacePin();
       } else if (data.type === 'PAN_TO_POINT') {
         map.setView([data.lat, data.lon], data.zoom || 16);
       } else if (data.type === 'UPDATE_LIVE_LOCATION') {
@@ -1287,7 +1581,8 @@ export function getMapHtml(): string {
         const heading = data.heading || 0;
         const speedKmh = data.speedKmh || 0;
 
-        document.getElementById('gps-status-readout').innerText = 'GPS: ' + lat.toFixed(4) + ', ' + lon.toFixed(4) + ' (±' + Math.round(acc) + 'm)';
+        const gpsReadoutEl = document.getElementById('gps-status-readout');
+        if (gpsReadoutEl) gpsReadoutEl.innerText = 'GPS: ' + lat.toFixed(4) + ', ' + lon.toFixed(4) + ' (±' + Math.round(acc) + 'm)';
 
         if (!liveGpsMarker) {
           liveGpsMarker = L.marker([lat, lon], { icon: createGpsRadarIcon(), zIndexOffset: 900 }).addTo(map);
@@ -1310,11 +1605,10 @@ export function getMapHtml(): string {
         if (Array.isArray(data.pois)) {
           data.pois.forEach(poi => {
             const m = L.marker([poi.lat, poi.lon], { icon: createPoiIcon(poi.icon) });
-            m.bindPopup(
-              '<div class="popup-title">' + poi.icon + ' ' + poi.name + '</div>' +
-              '<div class="popup-sub">' + (poi.address || '') + ' (' + poi.distanceKm + ' km)</div>' +
-              '<button class="popup-btn" onclick="notifyParent(\\'POI_CLICKED\\', { poi: ' + JSON.stringify(poi).replace(/"/g, '&quot;') + ' })">▶ Route Here</button>'
-            );
+            m.on('click', function(ev) {
+              if (ev && ev.originalEvent) L.DomEvent.stopPropagation(ev.originalEvent);
+              triggerPlaceSelection(poi.lat, poi.lon, poi.name, poi.category, poi.address);
+            });
             poiMarkersGroup.addLayer(m);
           });
         }

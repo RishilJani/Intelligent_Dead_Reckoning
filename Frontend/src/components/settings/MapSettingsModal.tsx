@@ -20,6 +20,11 @@ interface MapSettingsModalProps {
   voiceGuidance: boolean;
   offlineTileCount: number;
   cacheSizeMb: string;
+  isGuest?: boolean;
+  userName?: string | null;
+  userEmail?: string | null;
+  onRequireAuth?: () => void;
+  onLogout?: () => void;
   onClose: () => void;
   onSelectLayer: (layer: MapTileLayerType) => void;
   onToggleValhallaTiles: () => void;
@@ -42,6 +47,11 @@ export function MapSettingsModal({
   voiceGuidance,
   offlineTileCount,
   cacheSizeMb,
+  isGuest = false,
+  userName,
+  userEmail,
+  onRequireAuth,
+  onLogout,
   onClose,
   onSelectLayer,
   onToggleValhallaTiles,
@@ -93,7 +103,7 @@ export function MapSettingsModal({
               ]}>
               <View style={styles.headerRow}>
                 <Text style={[styles.headerTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
-                  Map & Offline Controls
+                  Map & System Settings
                 </Text>
                 <TouchableOpacity
                   style={[
@@ -106,6 +116,63 @@ export function MapSettingsModal({
               </View>
 
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
+                {/* User Account / Guest Status Card */}
+                <Text style={[styles.sectionTitle, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+                  ACCOUNT & SESSION
+                </Text>
+                <View
+                  style={[
+                    styles.offlineCard,
+                    {
+                      backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+                      marginBottom: 16,
+                      borderWidth: 1,
+                      borderColor: isGuest ? 'rgba(234, 179, 8, 0.3)' : 'rgba(16, 185, 129, 0.3)',
+                    },
+                  ]}>
+                  {isGuest ? (
+                    <View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <Text style={{ fontSize: 16 }}>🔒</Text>
+                        <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '800' }}>
+                          Guest Mode Active
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 11.5, color: '#94a3b8', marginBottom: 12 }}>
+                        Search and directions are locked. Sign up or log in to unlock full navigation.
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.offlineBtn, { backgroundColor: '#0284c7' }]}
+                        onPress={() => {
+                          onClose();
+                          onRequireAuth?.();
+                        }}>
+                        <Text style={styles.offlineBtnText}>🚀 Sign Up / Log In Now</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <Text style={{ fontSize: 16 }}>👤</Text>
+                        <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '800' }}>
+                          Logged In as {userName || 'User'}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 11.5, color: '#94a3b8', marginBottom: 12 }}>
+                        {userEmail || 'Authenticated Session'} • Full Navigation Active
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.offlineBtn, { backgroundColor: '#ef4444' }]}
+                        onPress={() => {
+                          onClose();
+                          onLogout?.();
+                        }}>
+                        <Text style={styles.offlineBtnText}>🚪 Log Out to Guest Mode</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
                 {/* Offline Storage Section */}
                 <Text style={[styles.sectionTitle, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
                   OFFLINE MAP TILES (ANDROID APP & WEB)
