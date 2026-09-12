@@ -1,4 +1,4 @@
-const { FAVOURITES_TBL, USER_ID } = require("../stringConstants");
+const { FAVOURITES_TBL, USER_ID, FAV_ID } = require("../stringConstants");
 const supabase = require("../supabase");
 
 // get all favourite places
@@ -62,5 +62,23 @@ async function addFavouritePlace(req, res) {
 
 }
 
+// remove favourite place of user
+async function deleteFavourite(req, res) {
+    const { fav_id } = req.params;
+    if (!fav_id || isNaN(fav_id)) {
+        return res.status(400).json({ message: "Favourite id is not valid" });
+    }
+    try {
+        const { data, error } = await supabase.from(FAVOURITES_TBL).delete().eq(FAV_ID, Number(fav_id));
+        if (error) {
+            console.error("error = ", error.message);
+            return res.status(500).json({ success: false, message: error.message });
+        }
+        return res.status(200).json({ success: true, fav_id });
+    } catch (err) {
+        console.error('err = ', err);
+        res.status(500).json({ message: err.message });
+    }
+}
 
 module.exports = { getAllFavPlaces, getAllFavPlacesByUserId, addFavouritePlace };
