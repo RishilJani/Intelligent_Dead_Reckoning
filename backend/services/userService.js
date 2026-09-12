@@ -63,6 +63,7 @@ async function addUser(req, res) {
     }
 }
 
+// delete user
 async function deleteUser(req, res) {
     const { user_id } = req.params;
     if (isNaN(user_id)) {
@@ -81,6 +82,7 @@ async function deleteUser(req, res) {
     }
 }
 
+// update User
 async function updateUser(req, res) {
     const { user_id } = req.params;
     if (isNaN(user_id)) {
@@ -107,4 +109,34 @@ async function updateUser(req, res) {
     }
 }
 
-module.exports = { getAllUsers, getByUserId, addUser, deleteUser, updateUser };
+async function login(req, res) {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).json({ message: "Email and Password are required" });
+    }
+    try {
+        const { data, error } = await supabase.from(USERS_TBL).select("*").eq(EMAIL, email);
+        if (error) {
+            console.error("error = ", error.message);
+            return res.status(500).json({ message: error.message });
+        }
+        if (data.length == 0) {
+            return res.status(404).json({ message: "No user found" });
+        }
+
+        console.log("data = ", data);
+        // TODO : check hash 
+        if (data[0].password_hash === password) {
+            const { password_hash, ...result } = data[0];
+            return res.json({ success: true, data: result });
+        } else {
+            return res.status(401).json({ success: false, message: "Credentials do not match" });
+        }
+        return res.json({ success: true });
+    } catch (err) {
+        console.error('err = ', err);
+        res.status(500).json({ message: err.message });
+    }
+}
+
+module.exports = { getAllUsers, getByUserId, addUser, deleteUser, updateUser, login };
