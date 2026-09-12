@@ -1,20 +1,17 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Platform } from 'react-native';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import api from './api';
 
 export interface User {
   username: string;
   email: string;
 }
 
-interface StoredAccount extends User {
-  password: string;
-}
-
 export interface AuthContextType {
   user: User | null;
+  token: string | null;
   isGuest: boolean;
-  signup: (username: string, email: string, password: string, confirmPassword: string) => { success: boolean; error?: string };
-  login: (email: string, password: string) => { success: boolean; error?: string };
+  signup: (username: string, email: string, password: string, confirmPassword: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   continueAsGuest: () => void;
 }
@@ -22,27 +19,25 @@ export interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const STORAGE_KEY_USER = 'nav_current_user';
-const STORAGE_KEY_ACCOUNTS = 'nav_registered_accounts';
+const STORAGE_KEY_TOKEN = 'nav_jwt_token';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // New user starts in Guest Mode by default
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isGuest, setIsGuest] = useState<boolean>(true);
-  const [accounts, setAccounts] = useState<StoredAccount[]>([]);
 
-  // Load any previously persisted session on mount (Web)
+  // Load any previously persisted session on mount
   useEffect(() => {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
-        const storedAccounts = window.localStorage.getItem(STORAGE_KEY_ACCOUNTS);
-        if (storedAccounts) {
-          setAccounts(JSON.parse(storedAccounts));
-        }
         const storedUser = window.localStorage.getItem(STORAGE_KEY_USER);
+        const storedToken = window.localStorage.getItem(STORAGE_KEY_TOKEN);
         if (storedUser) {
-          const parsed = JSON.parse(storedUser);
-          setUser(parsed);
+          setUser(JSON.parse(storedUser));
           setIsGuest(false);
+        }
+        if (storedToken) {
+          setToken(storedToken);
         }
       }
     } catch (_e) {
@@ -50,12 +45,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const signup = (
+  const signup = async (
     username: string,
     email: string,
     password: string,
     confirmPassword: string
-  ): { success: boolean; error?: string } => {
+  ): Promise<{ success: boolean; error?: string }> => {
     const trimmedUser = username.trim();
     const trimmedEmail = email.trim().toLowerCase();
 
@@ -72,40 +67,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: 'Passwords do not match.' };
     }
 
-    // Check if email already registered
-    const existing = accounts.find((a) => a.email === trimmedEmail);
-    if (existing) {
-      return { success: false, error: 'An account with this email already exists.' };
-    }
-
-    const newAccount: StoredAccount = {
-      username: trimmedUser,
-      email: trimmedEmail,
-      password,
-    };
-
-    const updatedAccounts = [...accounts, newAccount];
-    setAccounts(updatedAccounts);
-
-    const newUser: User = { username: trimmedUser, email: trimmedEmail };
-    setUser(newUser);
-    setIsGuest(false);
-
     try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(updatedAccounts));
-        window.localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser));
-      }
-    } catch (_e) {}
+      // Call backend signup endpoint: "users/signup"
+      const response = await api.post('users/signup', {
+        user_name: trimmedUser,
+        email: trimmedEmail,
+        password,
+      });
 
-    return { success: true };
+      if (response.data && response.data.success) {
+        const newUser: User = {
+          username: response.data.data?.user_name || trimmedUser,
+          email: response.data.data?.email || trimmedEmail,
+        };
+        const authToken = response.data.token || null;
+
+        setUser(newUser);
+        setToken(authToken);
+        setIsGuest(false);
+
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser));
+            if (authToken) {
+              window.localStorage.setItem(STORAGE_KEY_TOKEN, authToken);
+            }
+          }
+        } catch (_e) { }
+
+        return { success: true };
+      } else {
+        return { success: false, error: response.data?.message || 'Failed to sign up.' };
+      }
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || err.message || 'Unable to connect to server.';
+      return { success: false, error: errorMsg };
+    }
   };
 
-  const login = (
+  const login = async (
     email: string,
     password: string
-  ): { success: boolean; error?: string } => {
+  ): Promise<{ success: boolean; error?: string }> => {
     const trimmedEmail = email.trim().toLowerCase();
+    console.log("Frontend login 1....");
 
     if (!trimmedEmail) {
       return { success: false, error: 'Please enter your email.' };
@@ -114,47 +119,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: 'Please enter your password.' };
     }
 
-    const account = accounts.find((a) => a.email === trimmedEmail);
-    if (!account) {
-      // If no account found, also allow quick-login for demo if accounts list is empty or matching
-      if (accounts.length === 0) {
-        // Automatically create account for convenience if demo
-        const demoUser: User = {
-          username: trimmedEmail.split('@')[0],
-          email: trimmedEmail,
-        };
-        setUser(demoUser);
-        setIsGuest(false);
-        return { success: true };
-      }
-      return { success: false, error: 'No account found with this email. Please sign up first.' };
-    }
-
-    if (account.password !== password) {
-      return { success: false, error: 'Incorrect password. Please try again.' };
-    }
-
-    const loggedInUser: User = { username: account.username, email: account.email };
-    setUser(loggedInUser);
-    setIsGuest(false);
-
     try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(loggedInUser));
-      }
-    } catch (_e) {}
+      // Call backend login endpoint: "users/login"
+      const response = await api.post('users/login', {
+        email: trimmedEmail,
+        password,
+      });
+      console.log("Frontend login 2....");
+      if (response.data && response.data.success) {
+        const loggedInUser: User = {
+          username: response.data.data?.user_name || trimmedEmail.split('@')[0],
+          email: response.data.data?.email || trimmedEmail,
+        };
+        const authToken = response.data.token || null;
+        console.log("Frontend login 3....");
 
-    return { success: true };
+        setUser(loggedInUser);
+        setToken(authToken);
+        setIsGuest(false);
+
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(loggedInUser));
+            if (authToken) {
+              window.localStorage.setItem(STORAGE_KEY_TOKEN, authToken);
+            }
+          }
+        } catch (_e) { }
+
+        return { success: true };
+      } else {
+        return { success: false, error: response.data?.message || 'Invalid credentials.' };
+      }
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || err.message || 'Unable to connect to server.';
+      return { success: false, error: errorMsg };
+    }
   };
 
   const logout = () => {
     setUser(null);
+    setToken(null);
     setIsGuest(true);
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.removeItem(STORAGE_KEY_USER);
+        window.localStorage.removeItem(STORAGE_KEY_TOKEN);
       }
-    } catch (_e) {}
+    } catch (_e) { }
   };
 
   const continueAsGuest = () => {
@@ -166,6 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        token,
         isGuest,
         signup,
         login,

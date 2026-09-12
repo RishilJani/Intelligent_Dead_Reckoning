@@ -1,62 +1,47 @@
 /**
- * TensorFlow Dual-Model On-Device Inference Engine for Dead Reckoning
+ * TensorFlow On-Device Speed Inference Engine for Dead Reckoning
  * 
- * Replaces legacy ONNX architecture with dual specialized TensorFlow neural networks:
- * 1. Speed Regressor (best_speed_model.pt -> TFSpeedRegressor):
- *    Input: 20 samples of 10 features [20, 10] @ 10Hz
- *    Architecture: Conv1D(10->32) + BatchNorm + Conv1D(32->64) + BatchNorm + BiLSTM(64) + RepPooling + Dense
- *    Output: Vehicle speed in km/h (de-normalized & non-negative clamped)
+ * Executes specialized TensorFlow neural network for Speed Regression:
+ * Speed Regressor (best_speed_model2.pt -> TFSpeedRegressor):
+ * Input: 20 samples of 10 features [20, 10] @ 10Hz
+ * Architecture: Conv1D(10->32) + BatchNorm + Conv1D(32->64) + BatchNorm + BiLSTM(64) + RepPooling + Dense
+ * Output: Vehicle speed in km/h (de-normalized & non-negative clamped)
  * 
- * 2. Yaw Regressor (yaw_canbus_model.pt -> TFYawRegressor):
- *    Input: 20 samples of 7 features [20, 7] @ 20Hz (6 IMU channels + cumulative gyro_z integral)
- *    Architecture: 2-Layer BiLSTM(64) + LastStep + Dense
- *    Output: CAN-bus yaw rate in deg/s
+ * (Direction/yaw model has been removed to rely purely on speed prediction and route-constrained guidance)
  */
 
-import dualWeightsData from '@/../assets/models/tf_dual_weights.json';
+import speedWeightsData from '@/../assets/models/tf_speed_weights.json';
 
 export interface ModelPrediction {
   speedKmh: number;
-  yawRateDps: number;
+  yawRateDps?: number;
 }
 
 interface SpeedMeta {
   arch: string;
+  source_checkpoint?: string;
   task: string;
   in_shape: [number, number];
   feat_mean: number[];
   feat_std: number[];
   label_mean: number;
   label_std: number;
+  val_loss?: number;
+  epoch?: number;
   features: string[];
 }
 
-interface YawMeta {
-  arch: string;
-  task: string;
-  in_shape: [number, number];
-  feat_mean: number[];
-  feat_std: number[];
-  yaw_mean: number;
-  yaw_std: number;
-  features: string[];
-}
-
-interface DualWeightsStructure {
+interface SpeedWeightsStructure {
   _meta: {
     format: string;
     speed_model: SpeedMeta;
-    yaw_model: YawMeta;
   };
   speed: Record<string, any>;
-  yaw: Record<string, any>;
 }
 
-const data = dualWeightsData as unknown as DualWeightsStructure;
+const data = speedWeightsData as unknown as SpeedWeightsStructure;
 const metaSpeed = data._meta.speed_model;
-const metaYaw = data._meta.yaw_model;
 const speedWeights = data.speed;
-const yawWeights = data.yaw;
 
 // Numerical helpers
 function sigmoid(x: number): number {
@@ -335,80 +320,7 @@ export function predictSpeed(rawWindow20x10: number[][]): number {
 }
 
 /**
- * Predict Yaw Rate (deg/s) using TensorFlow Yaw Regressor
- */
-export function predictYawRate(rawWindow20x7: number[][]): number {
-  const seqLen = 20;
-  const inFeats = 7;
-
-  // 1. Feature normalization
-  const normInputs: Float32Array[] = new Array(seqLen);
-  for (let t = 0; t < seqLen; t++) {
-    const row = new Float32Array(inFeats);
-    for (let f = 0; f < inFeats; f++) {
-      row[f] = (rawWindow20x7[t][f] - metaYaw.feat_mean[f]) / metaYaw.feat_std[f];
-    }
-    normInputs[t] = row;
-  }
-
-  // 2. BiLSTM Layer 0: in 7, hidden 64 -> (20, 128)
-  const l0Out = runBiLstmSequence(
-    normInputs,
-    yawWeights['lstm.weight_ih_l0'],
-    yawWeights['lstm.weight_hh_l0'],
-    yawWeights['lstm.bias_ih_l0'],
-    yawWeights['lstm.bias_hh_l0'],
-    yawWeights['lstm.weight_ih_l0_reverse'],
-    yawWeights['lstm.weight_hh_l0_reverse'],
-    yawWeights['lstm.bias_ih_l0_reverse'],
-    yawWeights['lstm.bias_hh_l0_reverse']
-  );
-
-  // 3. BiLSTM Layer 1: in 128, hidden 64 -> (20, 128)
-  const l1Out = runBiLstmSequence(
-    l0Out,
-    yawWeights['lstm.weight_ih_l1'],
-    yawWeights['lstm.weight_hh_l1'],
-    yawWeights['lstm.bias_ih_l1'],
-    yawWeights['lstm.bias_hh_l1'],
-    yawWeights['lstm.weight_ih_l1_reverse'],
-    yawWeights['lstm.weight_hh_l1_reverse'],
-    yawWeights['lstm.bias_ih_l1_reverse'],
-    yawWeights['lstm.bias_hh_l1_reverse']
-  );
-
-  // 4. Last Step representation: l1Out[seqLen - 1] (128 units)
-  const lastStep = l1Out[seqLen - 1];
-
-  // 5. Head: Linear 128 -> 64 + ReLU + Linear 64 -> 1
-  const wH0: number[][] = yawWeights['head.0.weight'];
-  const bH0: number[] = yawWeights['head.0.bias'];
-  const h0 = new Float32Array(64);
-
-  for (let i = 0; i < 64; i++) {
-    let sum = bH0[i];
-    const row = wH0[i];
-    for (let j = 0; j < 128; j++) {
-      sum += row[j] * lastStep[j];
-    }
-    h0[i] = sum > 0 ? sum : 0;
-  }
-
-  const wH3: number[][] = yawWeights['head.3.weight'];
-  const bH3: number[] = yawWeights['head.3.bias'];
-  let rawPred = bH3[0];
-  const rowH3 = wH3[0];
-  for (let j = 0; j < 64; j++) {
-    rawPred += rowH3[j] * h0[j];
-  }
-
-  // 6. De-normalization to deg/s
-  const yawRateDps = rawPred * metaYaw.yaw_std + metaYaw.yaw_mean;
-  return yawRateDps;
-}
-
-/**
- * Drop-in Dead Reckoning Predictor executing both TensorFlow models
+ * Dead Reckoning Speed Predictor executing TensorFlow Speed Regressor
  * Expects 20-sample rolling IMU window from sensor pipeline.
  */
 export function predictDeadReckoning(rawWindow: number[][]): ModelPrediction {
@@ -416,31 +328,12 @@ export function predictDeadReckoning(rawWindow: number[][]): ModelPrediction {
     throw new Error(`Invalid window shape [${rawWindow.length}, ${rawWindow[0]?.length}]. Expected [20, 10].`);
   }
 
-  // 1. Predict Speed using full 10 features
+  // Predict Speed using best_speed_model2.pt weights
   const speedKmh = predictSpeed(rawWindow);
-
-  // 2. Build 7 features for Yaw model:
-  // [accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z, gyro_z_integral]
-  const yawWindow: number[][] = new Array(20);
-  let cumIntegral = 0;
-  for (let t = 0; t < 20; t++) {
-    const gyroZ = rawWindow[t][5] || 0;
-    cumIntegral += gyroZ / 20.0;
-    yawWindow[t] = [
-      rawWindow[t][0] || 0,
-      rawWindow[t][1] || 0,
-      rawWindow[t][2] || 9.81,
-      rawWindow[t][3] || 0,
-      rawWindow[t][4] || 0,
-      gyroZ,
-      cumIntegral,
-    ];
-  }
-
-  const yawRateDps = predictYawRate(yawWindow);
 
   return {
     speedKmh: Number(speedKmh.toFixed(1)),
-    yawRateDps: Number(yawRateDps.toFixed(2)),
+    yawRateDps: 0,
   };
 }
+

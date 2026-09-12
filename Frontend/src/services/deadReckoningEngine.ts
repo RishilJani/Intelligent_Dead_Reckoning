@@ -45,9 +45,19 @@ export class DeadReckoningEngine {
 
   // Model prediction 2.0s interval control
   private lastModelInferenceTime = 0;
-  private readonly MODEL_INTERVAL_MS = 2000; // 2.0s gap between ONNX neural model predictions
+  private readonly MODEL_INTERVAL_MS = 2000; // 2.0s gap between neural model predictions
   private lastPredictedSpeedKmh = 0;
   private lastPredictedYawRateDps = 0;
+
+  // ── MODEL SPEED PREDICTION BARRIER ────────────────────────
+  // Suppresses sudden transient speed jumps caused by sharp mobile twitches.
+  // - If model suddenly predicts high speed and it stays around that speed, keep that speed.
+  // - If it suddenly predicts high speed and then suddenly drops back down to low speed,
+  //   ignore that spike and keep past speed and location.
+  private confirmedSpeedKmh = 0;
+  private candidateHighSpeedKmh: number | null = null;
+  private readonly SUDDEN_SPEED_JUMP_KMH = 12.0; // Jump threshold to trigger barrier verification
+  private readonly SPEED_MAINTAIN_TOLERANCE_KMH = 10.0; // Speed band considered "around that speed"
 
   private constructor() {
     this.sensorPipeline = SensorPipeline.getInstance();
@@ -82,11 +92,13 @@ export class DeadReckoningEngine {
     this.lastModelInferenceTime = 0;
     this.lastPredictedSpeedKmh = 0;
     this.lastPredictedYawRateDps = 0;
+    this.confirmedSpeedKmh = 0;
+    this.candidateHighSpeedKmh = null;
   }
 
   /**
    * Set offline mode. When offline is true, GPS is forced offline,
-   * so navigation location is driven by the ONNX dead-reckoning model with 2s epoch gap.
+   * so navigation location is driven by the dead-reckoning speed model with 2s epoch gap.
    */
   public setOfflineMode(offline: boolean) {
     this.isOfflineMode = offline;
@@ -95,10 +107,13 @@ export class DeadReckoningEngine {
       this.currentState.mode = 'TF_DEAD_RECKONING';
       this.lastModelInferenceTime = 0; // Trigger model inference immediately on next tick
 
-      // Anchor starting position from the last known GPS reading
+      // Anchor starting position and speed barrier from the last known GPS reading
       if (this.lastGpsCoords) {
         this.currentState.lat = this.lastGpsCoords.lat;
         this.currentState.lon = this.lastGpsCoords.lon;
+        this.confirmedSpeedKmh = this.lastGpsCoords.speedKmh || 0;
+        this.lastPredictedSpeedKmh = this.confirmedSpeedKmh;
+        this.candidateHighSpeedKmh = null;
         if (this.lastGpsCoords.heading !== 0) {
           this.currentState.heading = this.lastGpsCoords.heading;
         }
@@ -287,6 +302,9 @@ export class DeadReckoningEngine {
     this.currentState.mode = 'GPS';
     this.currentState.gpsAvailable = true;
     this.currentState.accuracyMeters = 8;
+    this.confirmedSpeedKmh = cleanSpeed;
+    this.lastPredictedSpeedKmh = cleanSpeed;
+    this.candidateHighSpeedKmh = null;
     this.broadcastState();
   }
 
@@ -327,6 +345,9 @@ export class DeadReckoningEngine {
         if (this.lastGpsCoords.heading !== 0) {
           this.currentState.heading = this.lastGpsCoords.heading;
         }
+        this.confirmedSpeedKmh = this.currentState.speedKmh;
+        this.lastPredictedSpeedKmh = this.currentState.speedKmh;
+        this.candidateHighSpeedKmh = null;
 
         // Broadcast state with real-time sensor telemetry
         this.broadcastState();
@@ -337,12 +358,60 @@ export class DeadReckoningEngine {
         if (isStationary) {
           this.lastPredictedSpeedKmh = 0;
           this.lastPredictedYawRateDps = 0;
+          this.confirmedSpeedKmh = 0;
+          this.candidateHighSpeedKmh = null;
         } else if (now - this.lastModelInferenceTime >= this.MODEL_INTERVAL_MS) {
           // Execute Model prediction with a 2-second interval gap (20 samples window @ 10Hz)
           try {
             const pred: ModelPrediction = predictDeadReckoning(windowData);
-            this.lastPredictedSpeedKmh = Math.max(0, pred.speedKmh);
-            this.lastPredictedYawRateDps = pred.yawRateDps;
+            const rawPredSpeed = Math.max(0, pred.speedKmh);
+
+            // ── EVALUATE SPEED BARRIER ──────────────────────────────
+            // When model suddenly predicts high speed:
+            // 1. If it stays around that speed, keep that data.
+            // 2. If it suddenly predicts high speed and then suddenly drops back down to low speed,
+            //    ignore the spike and keep past speed and location.
+            if (this.candidateHighSpeedKmh === null) {
+              const jump = rawPredSpeed - this.confirmedSpeedKmh;
+              if (jump > this.SUDDEN_SPEED_JUMP_KMH) {
+                // Sudden high speed jump detected: hold as candidate, do not surge forward yet
+                this.candidateHighSpeedKmh = rawPredSpeed;
+                // Maintain past speed for navigation displacement & display
+                this.lastPredictedSpeedKmh = this.confirmedSpeedKmh;
+              } else {
+                // Gradual or steady speed change: confirm immediately
+                this.confirmedSpeedKmh = rawPredSpeed;
+                this.lastPredictedSpeedKmh = rawPredSpeed;
+              }
+            } else {
+              // We have a pending candidate from previous prediction epoch
+              const diffFromCandidate = Math.abs(rawPredSpeed - this.candidateHighSpeedKmh);
+              const isMaintained =
+                diffFromCandidate <= this.SPEED_MAINTAIN_TOLERANCE_KMH ||
+                rawPredSpeed >= this.candidateHighSpeedKmh - 5.0;
+
+              if (isMaintained) {
+                // Stays around that high speed: genuine vehicle acceleration confirmed!
+                this.confirmedSpeedKmh = rawPredSpeed;
+                this.lastPredictedSpeedKmh = rawPredSpeed;
+                this.candidateHighSpeedKmh = null;
+              } else {
+                // Sudden spike followed by low speed: spurious hand movement!
+                // Discard spike, preserve past speed and integrate location with past speed
+                this.candidateHighSpeedKmh = null;
+                if (rawPredSpeed <= this.confirmedSpeedKmh + 5.0) {
+                  this.confirmedSpeedKmh = rawPredSpeed;
+                }
+                this.lastPredictedSpeedKmh = this.confirmedSpeedKmh;
+              }
+            }
+
+            // Real-time device gyroscope yaw rate for telemetry display
+            const gyroZ = telemetry?.gyroZ || 0;
+            const gyroYawRateDps = -(gyroZ * (180 / Math.PI));
+            this.lastPredictedYawRateDps =
+              Math.abs(gyroYawRateDps) > 1.0 ? Number(gyroYawRateDps.toFixed(1)) : 0;
+
             this.lastModelInferenceTime = now;
           } catch (modelErr) {
             console.warn('[DeadReckoningEngine] Model inference warning:', modelErr);
