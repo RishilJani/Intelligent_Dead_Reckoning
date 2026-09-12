@@ -1,0 +1,28 @@
+{
+  "name": "intelligent_dead_reckoning",
+  "version": "1.0.0",
+  "description": "SIH Project",
+  "homepage": "https://github.com/RishilJani/Intelligent_Dead_Reckoning#readme",
+  "bugs": {
+    "url": "https://github.com/RishilJani/Intelligent_Dead_Reckoning/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RishilJani/Intelligent_Dead_Reckoning.git"
+  },
+  "license": "ISC",
+  "author": "Rishil Jani",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "nodemon": "^3.1.14",
+    "pg": "^8.23.0"
+  }
+}
