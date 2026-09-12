@@ -4,31 +4,39 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DisplayMap, DisplayMapHandle } from '@/components/displaymap/DisplayMap';
 import { MapControls } from '@/components/displaymap/MapControls';
-import { FloatingRoutePill } from '@/components/routing/FloatingRoutePill';
+import { FloatingSearchBar } from '@/components/routing/FloatingSearchBar';
 import { TravelModeModal } from '@/components/routing/TravelModeModal';
-import { PoiCategoryBar, POICategory } from '@/components/routing/PoiCategoryBar';
 import { NavigationCard } from '@/components/navigation/NavigationCard';
 import { MapSettingsModal } from '@/components/settings/MapSettingsModal';
 import { useLocationTracker, LiveCoords } from '@/hooks/useLocationTracker';
 import { DeadReckoningEngine, DeadReckoningState } from '@/services/deadReckoningEngine';
 import { SensorPipeline, LiveSensorTelemetry } from '@/services/sensorPipeline';
 
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/services/authContext';
+
 import {
   LocationPoint,
   CostingMode,
   MapTileLayerType,
   RouteStatistics,
-  POIItem,
 } from '@/types/navigation';
-import { fetchNearbyPOIs } from '@/services/geocoding';
 
 export default function NavigationScreen() {
+  const router = useRouter();
+  const { user, isGuest, logout } = useAuth();
+
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
 
   const mapRef = useRef<DisplayMapHandle | null>(null);
   const deadReckoning = useRef<DeadReckoningEngine>(DeadReckoningEngine.getInstance()).current;
+
+  // Prompt or redirect guest user to sign up page
+  const handleRequireAuth = useCallback(() => {
+    router.push('/signup');
+  }, [router]);
 
   // Cross-platform map command sender
   const sendMapCommand = useCallback((type: string, payload: any = {}) => {
@@ -84,18 +92,39 @@ export default function NavigationScreen() {
 
   // Route Points & States
   const [endPoint, setEndPoint] = useState<LocationPoint | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<LocationPoint | null>(null);
+  const [isPreviewingDirections, setIsPreviewingDirections] = useState<boolean>(false);
   const [mapClickTarget, setMapClickTarget] = useState<'start' | 'end'>('end');
+
+  // Helper for computing distance between user location and selected place
+  const distanceToSelectedPlace = React.useMemo(() => {
+    if (!selectedPlace) return null;
+    const userLat = liveCoords?.lat ?? startPoint?.lat;
+    const userLon = liveCoords?.lon ?? startPoint?.lon;
+    if (userLat == null || userLon == null) return null;
+
+    const R = 6371000; // meters
+    const dLat = ((selectedPlace.lat - userLat) * Math.PI) / 180;
+    const dLon = ((selectedPlace.lon - userLon) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((userLat * Math.PI) / 180) *
+        Math.cos((selectedPlace.lat * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const meters = R * c;
+    if (meters < 1000) {
+      return `${Math.round(meters)} m`;
+    }
+    return `${(meters / 1000).toFixed(1)} km`;
+  }, [selectedPlace, liveCoords, startPoint]);
 
   // Travel Mode (Costing) & Map Layer
   const [activeCosting, setActiveCosting] = useState<CostingMode>('auto');
   const [activeLayer, setActiveLayer] = useState<MapTileLayerType>('osm_standard');
   const [showValhallaTiles, setShowValhallaTiles] = useState<boolean>(true);
-  const [is3DMode, setIs3DMode] = useState<boolean>(false);
   const [voiceGuidance, setVoiceGuidance] = useState<boolean>(true);
-
-  // POI Discover States
-  const [activePoiCategory, setActivePoiCategory] = useState<POIItem['category'] | null>(null);
-  const [, setNearbyPois] = useState<POIItem[]>([]);
 
   // Modals & Drawers
   const [showTravelModes, setShowTravelModes] = useState<boolean>(false);
@@ -172,6 +201,8 @@ export default function NavigationScreen() {
           setIsLoadingRoute(true);
         } else if (data.type === 'NAV_COMPLETED') {
           setIsNavigating(false);
+          setIsPreviewingDirections(false);
+          setSelectedPlace(null);
           setCurrentSpeedKmh(0);
           deadReckoning.stop();
         } else if (data.type === 'REAL_NAV_STEP_UPDATE') {
@@ -202,23 +233,42 @@ export default function NavigationScreen() {
           } else if (data.target === 'end') {
             const pt = { lat: data.lat, lon: data.lon, name: data.name };
             setEndPoint(pt);
+            setSelectedPlace(pt);
           }
+        } else if (data.type === 'PLACE_SELECTED') {
+          // Point selected via long-press or POI click, but NOT set as end point yet
+          const pt: LocationPoint = {
+            lat: Number(data.lat),
+            lon: Number(data.lon),
+            name: data.name || 'Selected Place',
+          };
+          setSelectedPlace(pt);
+          setIsPreviewingDirections(false);
         } else if (data.type === 'POI_CLICKED') {
           if (data.poi) {
-            const destPt: LocationPoint = {
-              lat: data.poi.lat,
-              lon: data.poi.lon,
-              name: data.poi.name,
+            const pt: LocationPoint = {
+              lat: Number(data.poi.lat),
+              lon: Number(data.poi.lon),
+              name: data.poi.name || 'Selected Place',
             };
-            setEndPoint(destPt);
-            updateRoute(startPoint, destPt);
+            setSelectedPlace(pt);
+            setIsPreviewingDirections(false);
           }
+        } else if (data.type === 'MAP_CLICKED') {
+          // Regular tap anywhere on map: dismiss selection card if not previewing or navigating
+          setSelectedPlace((prev) => {
+            if (prev) {
+              sendMapCommand('CLEAR_SELECTED_PLACE');
+              return null;
+            }
+            return null;
+          });
         }
       } catch (err) {
         // Ignore invalid message JSON
       }
     },
-    [startPoint, setStartPoint, deadReckoning]
+    [startPoint, setStartPoint, deadReckoning, sendMapCommand]
   );
 
   // Search / Suggestion selection handlers
@@ -232,8 +282,15 @@ export default function NavigationScreen() {
   };
 
   const handleSelectEndPoint = (point: LocationPoint) => {
+    if (isGuest) {
+      router.push('/signup');
+      return;
+    }
+    setSelectedPlace(point);
     setEndPoint(point);
-    updateRoute(startPoint, point);
+    setIsPreviewingDirections(true);
+    sendMapCommand('PAN_TO_POINT', { lat: point.lat, lon: point.lon, zoom: 16 });
+    updateRoute(startPoint, point, activeCosting);
   };
 
   const handleSwapPoints = () => {
@@ -268,11 +325,66 @@ export default function NavigationScreen() {
     }
   };
 
-  // 3D POV Mode Toggle
-  const handleToggle3D = () => {
-    const nextVal = !is3DMode;
-    setIs3DMode(nextVal);
-    sendMapCommand('TOGGLE_3D_VIEW', { active: nextVal });
+  // Clear Destination Handler
+  const handleClearEndPoint = () => {
+    setEndPoint(null);
+    setSelectedPlace(null);
+    setIsPreviewingDirections(false);
+    setRouteStats(null);
+    sendMapCommand('SET_ROUTE_COORDS', { start: startPoint, end: null });
+    sendMapCommand('CLEAR_SELECTED_PLACE');
+  };
+
+  // User taps "Directions" on place card
+  const handleShowDirections = () => {
+    if (isGuest) {
+      router.push('/signup');
+      return;
+    }
+    const target = selectedPlace || endPoint;
+    if (!target) return;
+    setEndPoint(target);
+    setIsPreviewingDirections(true);
+    updateRoute(startPoint, target, activeCosting);
+  };
+
+  // User taps "Start Navigation" directly on place card
+  const handleDirectStartNavigation = () => {
+    if (isGuest) {
+      router.push('/signup');
+      return;
+    }
+    const target = selectedPlace || endPoint;
+    if (!target) return;
+    setEndPoint(target);
+    setIsPreviewingDirections(false);
+    updateRoute(startPoint, target, activeCosting);
+    if (!isNavigating) {
+      handleToggleNavigation();
+    }
+  };
+
+  // User taps ✕ on place card
+  const handleDismissPlace = () => {
+    setSelectedPlace(null);
+    sendMapCommand('CLEAR_SELECTED_PLACE');
+  };
+
+  // User taps "← Back" on directions preview card
+  const handleBackFromDirections = () => {
+    setIsPreviewingDirections(false);
+    setSelectedPlace(null);
+    handleClearEndPoint();
+  };
+
+  // User selects travel mode (car, bike, pedestrian) on directions preview
+  const handleSelectCosting = (mode: CostingMode) => {
+    setActiveCosting(mode);
+    sendMapCommand('SET_COSTING', { costing: mode });
+    const target = selectedPlace || endPoint;
+    if (startPoint && target) {
+      updateRoute(startPoint, target, mode);
+    }
   };
 
   // Offline Engine Toggle
@@ -289,30 +401,17 @@ export default function NavigationScreen() {
     sendMapCommand('SET_COSTING', { costing: mode });
   };
 
-  // POI Category Selection
-  const handleSelectPoiCategory = async (cat: POICategory) => {
-    if (activePoiCategory === cat.id) {
-      setActivePoiCategory(null);
-      setNearbyPois([]);
-      sendMapCommand('CLEAR_POIS', {});
-      return;
-    }
-
-    setActivePoiCategory(cat.id);
-    const centerLat = liveCoords ? liveCoords.lat : startPoint.lat;
-    const centerLon = liveCoords ? liveCoords.lon : startPoint.lon;
-
-    const pois = await fetchNearbyPOIs(centerLat, centerLon, cat.id);
-    setNearbyPois(pois);
-    sendMapCommand('RENDER_POIS', { pois });
-  };
-
   // Real Navigation Toggle with Dead Reckoning Integration
   const handleToggleNavigation = () => {
+    if (isGuest) {
+      router.push('/signup');
+      return;
+    }
     const nextNav = !isNavigating;
     setIsNavigating(nextNav);
 
     if (nextNav) {
+      setIsPreviewingDirections(false);
       // Immediately prime Dead Reckoning with the latest GPS coordinate so it starts in GPS mode
       if (liveCoords) {
         deadReckoning.updateGpsPosition(
@@ -354,6 +453,7 @@ export default function NavigationScreen() {
       sendMapCommand('TOGGLE_REAL_NAVIGATION', {
         active: false,
       });
+      setIsPreviewingDirections(false);
     }
   };
 
@@ -388,49 +488,37 @@ export default function NavigationScreen() {
       {/* 1. Full Screen Interactive Map with Base64 IndexedDB Tile Caching */}
       <DisplayMap ref={mapRef} onMapMessage={handleMapMessage} />
 
-      {/* 2. Floating Map Action Controls (Top Bar & Side Buttons) */}
+      {/* 2. Floating Map Action Controls (Side GPS & Settings) */}
       <MapControls
         isLiveTracking={isLiveTracking}
-        is3DMode={is3DMode}
-        isOfflineMode={isOfflineMode}
         showSettings={showSettingsModal}
         onCenterGPS={handleCenterGPS}
-        onToggle3D={handleToggle3D}
-        onToggleOffline={handleToggleOffline}
         onToggleSettings={() => setShowSettingsModal(true)}
       />
 
-      {/* 3. Floating Route Pill (Start A to Dest B Search Input) */}
-      {!isNavigating && (
-        <FloatingRoutePill
-          startPoint={startPoint}
-          endPoint={endPoint}
-          mapClickTarget={mapClickTarget}
-          onSelectStartPoint={handleSelectStartPoint}
+      {/* 3. Google Maps Style Floating Search Bar (Top Center) */}
+      {!isNavigating && !isPreviewingDirections && (
+        <FloatingSearchBar
+          endPoint={selectedPlace || endPoint}
           onSelectEndPoint={handleSelectEndPoint}
-          onSwapPoints={handleSwapPoints}
-          onToggleMapClickTarget={handleToggleMapClickTarget}
+          onClearEndPoint={handleClearEndPoint}
+          onOpenSettings={() => setShowSettingsModal(true)}
+          isGuest={isGuest}
+          onRequireAuth={handleRequireAuth}
+          userName={user?.username}
         />
       )}
 
-      {/* 4. Discover Nearby Places Horizontal Floating Pill Chips */}
-      {!isNavigating && (
-        <PoiCategoryBar
-          activeCategory={activePoiCategory}
-          onSelectCategory={handleSelectPoiCategory}
-        />
-      )}
-
-      {/* 5. Startup GPS Locating / Route Calculating Status Overlays */}
+      {/* 4. Startup GPS Locating / Route Calculating Status Overlays */}
       {isLocatingOnStartup && (
-        <View style={[styles.statusBanner, { top: Math.max(insets.top + 50, 60) }]}>
+        <View style={[styles.statusBanner, { top: Math.max(insets.top + 72, 80) }]}>
           <ActivityIndicator size="small" color="#38bdf8" />
           <Text style={styles.statusBannerText}>Acquiring Live GPS Location...</Text>
         </View>
       )}
 
       {isLoadingRoute && !isLocatingOnStartup && (
-        <View style={[styles.statusBanner, { top: Math.max(insets.top + 50, 60) }]}>
+        <View style={[styles.statusBanner, { top: Math.max(insets.top + 72, 80) }]}>
           <ActivityIndicator size="small" color="#38bdf8" />
           <Text style={styles.statusBannerText}>
             {isOfflineMode ? 'Solving Offline Route...' : 'Calculating Valhalla Route...'}
@@ -458,6 +546,16 @@ export default function NavigationScreen() {
         gpsAvailable={gpsAvailable}
         yawRateDps={predictedYawRate}
         telemetry={sensorTelemetry}
+        selectedPlace={selectedPlace}
+        distanceToSelectedPlace={distanceToSelectedPlace}
+        isPreviewingDirections={isPreviewingDirections}
+        isGuest={isGuest}
+        onRequireAuth={handleRequireAuth}
+        onShowDirections={handleShowDirections}
+        onDirectStartNavigation={handleDirectStartNavigation}
+        onDismissPlace={handleDismissPlace}
+        onBackFromDirections={handleBackFromDirections}
+        onSelectCosting={handleSelectCosting}
         onOpenTravelModes={() => setShowTravelModes(true)}
         onToggleNavigation={handleToggleNavigation}
       />
@@ -478,6 +576,11 @@ export default function NavigationScreen() {
         voiceGuidance={voiceGuidance}
         offlineTileCount={offlineTileCount}
         cacheSizeMb={cacheSizeMb}
+        isGuest={isGuest}
+        userName={user?.username}
+        userEmail={user?.email}
+        onRequireAuth={handleRequireAuth}
+        onLogout={logout}
         onClose={() => setShowSettingsModal(false)}
         onSelectLayer={handleSelectLayer}
         onToggleValhallaTiles={handleToggleValhallaTiles}
