@@ -19,7 +19,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const { user, isGuest, logout } = useAuth();
+  const { user, isGuest, logout, apiUrl } = useAuth();
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [activeLayer, setActiveLayer] = useState<MapTileLayerType>('osm_standard');
@@ -164,6 +164,17 @@ export default function ProfileScreen() {
               </Text>
               <Text style={[styles.detailValue, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
                 {isGuest ? 'Map View Only' : 'Search, Routing & Live Nav'}
+              </Text>
+            </View>
+
+            <View style={[styles.detailDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9' }]} />
+
+            <View style={styles.detailRow}>
+              <Text style={[styles.detailLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                🌐 API Base URL
+              </Text>
+              <Text style={[styles.detailValue, { color: '#38bdf8', fontSize: 13 }]}>
+                {apiUrl}
               </Text>
             </View>
 

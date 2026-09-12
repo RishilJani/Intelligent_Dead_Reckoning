@@ -28,7 +28,7 @@ export default function LoginScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setErrorMessage('');
     if (!email.trim()) {
       setErrorMessage('Please enter your email.');
@@ -40,15 +40,18 @@ export default function LoginScreen() {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      const result = login(email, password);
+    try {
+      const result = await login(email.trim(), password);
       setIsLoading(false);
       if (result.success) {
         router.replace('/');
       } else {
         setErrorMessage(result.error || 'Invalid credentials.');
       }
-    }, 400);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage(err?.message || 'Login failed. Please try again.');
+    }
   };
 
   const handleGuestBack = () => {

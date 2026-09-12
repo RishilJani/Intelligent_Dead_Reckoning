@@ -30,7 +30,7 @@ export default function SignUpScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     setErrorMessage('');
     if (!username.trim()) {
       setErrorMessage('Please enter your username.');
@@ -50,15 +50,18 @@ export default function SignUpScreen() {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      const result = signup(username, email, password, confirmPassword);
+    try {
+      const result = await signup(username, email, password, confirmPassword);
       setIsLoading(false);
       if (result.success) {
         router.replace('/');
       } else {
         setErrorMessage(result.error || 'Failed to sign up.');
       }
-    }, 400);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage(err.message || 'Server connection failed.');
+    }
   };
 
   const handleGuestBack = () => {
