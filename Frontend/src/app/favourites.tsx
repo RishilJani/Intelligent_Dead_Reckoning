@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from '@/components/common/LinearGradient';
 import { useAuth } from '@/services/authContext';
 import { getUserFromCache } from '@/services/userCache';
 import {
@@ -23,6 +24,7 @@ import {
   addFavourite,
   deleteFavourite,
 } from '@/services/favouriteService';
+import { SkyColors, SkyGradients } from '@/constants/theme';
 
 export default function FavouritesScreen() {
   const router = useRouter();
@@ -170,7 +172,7 @@ export default function FavouritesScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#090d16' : '#f8fafc' }]}>
+    <View style={[styles.container, { backgroundColor: '#ffffff' }]}>
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
@@ -184,7 +186,7 @@ export default function FavouritesScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => fetchFavourites(true)}
-            tintColor="#38bdf8"
+            tintColor={SkyColors.sky400}
           />
         }>
         {/* Top Nav Row */}
@@ -193,13 +195,12 @@ export default function FavouritesScreen() {
             style={styles.backBtn}
             onPress={() => router.back()}
             activeOpacity={0.7}>
-            <Text style={styles.backBtnText}>← Back</Text>
+            <Text style={[styles.backBtnText, { color: '#2C5EAD' }]}>← Back</Text>
           </TouchableOpacity>
-          <Text style={[styles.screenTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+          <Text style={[styles.screenTitle, { color: '#000000' }]}>
             Favourite Places
           </Text>
           <TouchableOpacity
-            style={[styles.addBtn, { opacity: isGuest ? 0.6 : 1 }]}
             onPress={() => {
               if (isGuest) {
                 router.push('/login');
@@ -208,8 +209,15 @@ export default function FavouritesScreen() {
                 setShowAddModal(true);
               }
             }}
-            activeOpacity={0.8}>
-            <Text style={styles.addBtnText}>+ Add</Text>
+            activeOpacity={0.8}
+            style={{ borderRadius: 12, overflow: 'hidden', opacity: isGuest ? 0.6 : 1 }}>
+            <LinearGradient
+              colors={SkyGradients.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.addBtnGradient}>
+              <Text style={styles.addBtnText}>+ Add</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -219,7 +227,7 @@ export default function FavouritesScreen() {
             style={[
               styles.guestCard,
               {
-                backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : '#ffffff',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
                 borderColor: '#f59e0b',
               },
             ]}>
@@ -227,10 +235,10 @@ export default function FavouritesScreen() {
               <Text style={{ fontSize: 24 }}>⭐</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.guestCardTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+              <Text style={[styles.guestCardTitle, { color: '#000000' }]}>
                 Guest Session
               </Text>
-              <Text style={[styles.guestCardSub, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+              <Text style={[styles.guestCardSub, { color: '#000000' }]}>
                 Log in or sign up to save favourite places, access them offline, and get 1-tap navigation.
               </Text>
               <View style={styles.guestActionsRow}>
@@ -255,19 +263,19 @@ export default function FavouritesScreen() {
             style={[
               styles.summaryCard,
               {
-                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : '#ffffff',
-                borderColor: isDark ? 'rgba(234, 179, 8, 0.3)' : 'rgba(202, 138, 4, 0.25)',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: isDark ? 'rgba(56, 189, 248, 0.3)' : SkyColors.skyBorderLight,
               },
             ]}>
             <View style={styles.summaryLeft}>
-              <View style={styles.summaryIconCircle}>
+              <View style={[styles.summaryIconCircle, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.2)' : SkyColors.sky100 }]}>
                 <Text style={{ fontSize: 24 }}>⭐</Text>
               </View>
               <View>
-                <Text style={[styles.summaryName, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                <Text style={[styles.summaryName, { color: '#000000' }]}>
                   {user?.user_name || user?.username || 'Navigator'}
                 </Text>
-                <Text style={[styles.summarySub, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                <Text style={[styles.summarySub, { color: '#000000' }]}>
                   {favourites.length} {favourites.length === 1 ? 'saved location' : 'saved locations'}
                 </Text>
               </View>
@@ -288,13 +296,13 @@ export default function FavouritesScreen() {
               style={[
                 styles.searchInput,
                 {
-                  backgroundColor: isDark ? 'rgba(15, 23, 42, 0.8)' : '#ffffff',
-                  color: isDark ? '#f8fafc' : '#0f172a',
-                  borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#e2e8f0',
+                  backgroundColor: isDark ? SkyColors.skyNight : SkyColors.sky50,
+                  color: '#000000',
+                  borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.sky200,
                 },
               ]}
               placeholder="Search saved places..."
-              placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+              placeholderTextColor="#64748b"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -304,8 +312,8 @@ export default function FavouritesScreen() {
         {/* Loading */}
         {loading && (
           <View style={styles.loadingWrapper}>
-            <ActivityIndicator size="large" color="#eab308" />
-            <Text style={[styles.loadingText, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+            <ActivityIndicator size="large" color={SkyColors.sky400} />
+            <Text style={[styles.loadingText, { color: '#000000' }]}>
               Loading favourite places...
             </Text>
           </View>
@@ -317,24 +325,30 @@ export default function FavouritesScreen() {
             style={[
               styles.emptyCard,
               {
-                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.6)' : '#ffffff',
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
               },
             ]}>
             <Text style={styles.emptyIcon}>⭐</Text>
-            <Text style={[styles.emptyTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+            <Text style={[styles.emptyTitle, { color: '#000000' }]}>
               {searchQuery ? 'No places match your search' : 'No favourite places yet'}
             </Text>
-            <Text style={[styles.emptySub, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+            <Text style={[styles.emptySub, { color: '#1f2937' }]}>
               {searchQuery
                 ? 'Try a different search term or clear the filter.'
                 : 'When checking directions on the map, tap the star (⭐) icon on any place card to add it to your favourites!'}
             </Text>
             <TouchableOpacity
-              style={styles.emptyActionBtn}
               onPress={() => router.navigate('/')}
-              activeOpacity={0.85}>
-              <Text style={styles.emptyActionBtnText}>🧭 Go to Map to Save Places</Text>
+              activeOpacity={0.85}
+              style={{ borderRadius: 14, overflow: 'hidden' }}>
+              <LinearGradient
+                colors={SkyGradients.primary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.emptyActionBtn}>
+                <Text style={styles.emptyActionBtnText}>🧭 Go to Map to Save Places</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         )}
@@ -347,31 +361,37 @@ export default function FavouritesScreen() {
               style={[
                 styles.favCard,
                 {
-                  backgroundColor: isDark ? 'rgba(15, 23, 42, 0.9)' : '#ffffff',
-                  borderColor: isDark ? 'rgba(234, 179, 8, 0.25)' : 'rgba(202, 138, 4, 0.2)',
+                  backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                  borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
                 },
               ]}>
               <View style={styles.favCardContent}>
-                <View style={styles.favIconCircle}>
+                <View style={[styles.favIconCircle, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.18)' : SkyColors.sky100 }]}>
                   <Text style={{ fontSize: 20 }}>📍</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text numberOfLines={1} style={[styles.favTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                  <Text numberOfLines={1} style={[styles.favTitle, { color: '#000000' }]}>
                     {item.fav_name}
                   </Text>
-                  <Text style={[styles.favCoords, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                  <Text style={[styles.favCoords, { color: '#000000' }]}>
                     {Number(item.latitude).toFixed(4)}, {Number(item.longitude).toFixed(4)}
                   </Text>
                 </View>
               </View>
 
               {/* Actions Row */}
-              <View style={[styles.favActionsRow, { borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9' }]}>
+              <View style={[styles.favActionsRow, { borderTopColor: isDark ? 'rgba(56, 189, 248, 0.15)' : SkyColors.sky100 }]}>
                 <TouchableOpacity
-                  style={[styles.actionBtn, styles.navigateBtn]}
+                  style={[styles.actionBtn, styles.navigateBtnWrapper]}
                   onPress={() => handleNavigateToPlace(item)}
-                  activeOpacity={0.8}>
-                  <Text style={styles.navigateBtnText}>🧭 Check Directions</Text>
+                  activeOpacity={0.85}>
+                  <LinearGradient
+                    colors={SkyGradients.primary}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.navigateGradient}>
+                    <Text style={styles.navigateBtnText}>Check Direction</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -396,12 +416,12 @@ export default function FavouritesScreen() {
             style={[
               styles.modalCard,
               {
-                backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                borderColor: isDark ? 'rgba(234, 179, 8, 0.3)' : 'rgba(0,0,0,0.1)',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
               },
             ]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+              <Text style={[styles.modalTitle, { color: '#000000' }]}>
                 ⭐ Add Favourite Place
               </Text>
               <TouchableOpacity onPress={() => setShowAddModal(false)} style={styles.modalCloseBtn}>
@@ -409,40 +429,40 @@ export default function FavouritesScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.inputLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+            <Text style={[styles.inputLabel, { color: '#000000' }]}>
               Place Name:
             </Text>
             <TextInput
               style={[
                 styles.modalInput,
                 {
-                  backgroundColor: isDark ? '#090d16' : '#f8fafc',
-                  color: isDark ? '#f8fafc' : '#0f172a',
-                  borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
+                  backgroundColor: isDark ? SkyColors.skyNight : SkyColors.sky50,
+                  color: '#000000',
+                  borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.sky200,
                 },
               ]}
               placeholder="e.g. Home, Office, University..."
-              placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+              placeholderTextColor="#64748b"
               value={newFavName}
               onChangeText={setNewFavName}
             />
 
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                <Text style={[styles.inputLabel, { color: '#000000' }]}>
                   Latitude:
                 </Text>
                 <TextInput
                   style={[
                     styles.modalInput,
                     {
-                      backgroundColor: isDark ? '#090d16' : '#f8fafc',
-                      color: isDark ? '#f8fafc' : '#0f172a',
-                      borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
+                      backgroundColor: isDark ? SkyColors.skyNight : SkyColors.sky50,
+                      color: '#000000',
+                      borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.sky200,
                     },
                   ]}
                   placeholder="e.g. 28.6139"
-                  placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+                  placeholderTextColor="#64748b"
                   keyboardType="numeric"
                   value={newLat}
                   onChangeText={setNewLat}
@@ -450,21 +470,21 @@ export default function FavouritesScreen() {
               </View>
 
               <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                <Text style={[styles.inputLabel, { color: '#000000' }]}>
                   Longitude:
                 </Text>
                 <TextInput
                   style={[
                     styles.modalInput,
                     {
-                      backgroundColor: isDark ? '#090d16' : '#f8fafc',
-                      color: isDark ? '#f8fafc' : '#0f172a',
-                      borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
+                      backgroundColor: isDark ? SkyColors.skyNight : SkyColors.sky50,
+                      color: '#000000',
+                      borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.sky200,
                     },
                   ]}
                   placeholder="e.g. 77.2090"
                   keyboardType="numeric"
-                  placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+                  placeholderTextColor="#64748b"
                   value={newLon}
                   onChangeText={setNewLon}
                 />
@@ -475,25 +495,31 @@ export default function FavouritesScreen() {
 
             <View style={styles.modalActionsRow}>
               <TouchableOpacity
-                style={[styles.modalCancelBtn, { borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1' }]}
+                style={[styles.modalCancelBtn, { borderColor: isDark ? 'rgba(56, 189, 248, 0.25)' : SkyColors.sky200 }]}
                 onPress={() => setShowAddModal(false)}
                 disabled={adding}
                 activeOpacity={0.7}>
-                <Text style={[styles.modalCancelText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                <Text style={[styles.modalCancelText, { color: '#000000' }]}>
                   Cancel
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.modalAddBtn}
+                style={styles.modalAddBtnWrapper}
                 onPress={handleManualAdd}
                 disabled={adding}
                 activeOpacity={0.85}>
-                {adding ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.modalAddText}>Add Place</Text>
-                )}
+                <LinearGradient
+                  colors={SkyGradients.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalAddGradient}>
+                  {adding ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.modalAddText}>Add Place</Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -536,14 +562,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
   },
-  addBtn: {
-    backgroundColor: '#eab308',
+  addBtnGradient: {
     paddingVertical: 7,
     paddingHorizontal: 16,
-    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addBtnText: {
-    color: '#0f172a',
+    color: '#ffffff',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -758,22 +784,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  navigateBtn: {
+  navigateBtnWrapper: {
     flex: 1,
-    height: 38,
-    backgroundColor: '#0284c7',
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+    // // shadowColor: '#2C5EAD',
+    // shadowOffset: { width: 0, height: 2 },
+    // shadowOpacity: 0.25,
+    // shadowRadius: 5,
+    // elevation: 3,
+  },
+  navigateGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    paddingHorizontal: 16,
   },
   navigateBtnText: {
     color: '#ffffff',
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: '800',
+    letterSpacing: 0.2,
   },
   deleteBtn: {
-    width: 38,
-    height: 38,
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(228, 87, 66, 0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderColor: 'rgba(228, 87, 66, 0.35)',
   },
   deleteBtnText: {
     fontSize: 14,
@@ -823,7 +864,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   errorText: {
-    color: '#ef4444',
+    color: '#E45742',
     fontSize: 12,
     fontWeight: '600',
     marginBottom: 10,
@@ -845,16 +886,19 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: '700',
   },
-  modalAddBtn: {
+  modalAddBtnWrapper: {
     flex: 1.5,
     height: 44,
-    backgroundColor: '#eab308',
     borderRadius: 14,
+    overflow: 'hidden',
+  },
+  modalAddGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalAddText: {
-    color: '#0f172a',
+    color: '#ffffff',
     fontSize: 13.5,
     fontWeight: '800',
   },

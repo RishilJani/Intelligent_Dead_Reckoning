@@ -11,8 +11,10 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from '@/components/common/LinearGradient';
 import { LocationPoint, SearchSuggestion } from '@/types/navigation';
 import { searchOpenStreetMap } from '@/services/geocoding';
+import { SkyColors, SkyGradients } from '@/constants/theme';
 
 interface FloatingSearchBarProps {
   endPoint: LocationPoint | null;
@@ -109,8 +111,8 @@ export function FloatingSearchBar({
           style={[
             styles.searchPill,
             {
-              backgroundColor: isDark ? 'rgba(15, 23, 42, 0.96)' : '#ffffff',
-              borderColor: 'rgba(56, 189, 248, 0.35)',
+              backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+              borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
             },
           ]}
           onPress={onRequireAuth}
@@ -124,7 +126,7 @@ export function FloatingSearchBar({
               style={{
                 fontSize: 13,
                 fontWeight: '700',
-                color: isDark ? '#f8fafc' : '#0f172a',
+                color: '#000000',
               }}>
               Search Locked in Guest Mode
             </Text>
@@ -132,23 +134,26 @@ export function FloatingSearchBar({
               numberOfLines={1}
               style={{
                 fontSize: 11,
-                color: '#38bdf8',
+                color: '#334155',
                 fontWeight: '600',
               }}>
               Sign up or log in to search & navigate
             </Text>
           </View>
-          <View
-            style={{
-              backgroundColor: '#0284c7',
-              paddingHorizontal: 12,
-              paddingVertical: 7,
-              borderRadius: 14,
-              marginRight: 6,
-            }}>
-            <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '800' }}>
-              Sign In 🚀
-            </Text>
+          <View style={{ borderRadius: 14, overflow: 'hidden', marginRight: 6 }}>
+            <LinearGradient
+              colors={SkyGradients.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: 14,
+              }}>
+              <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '800' }}>
+                Sign In 🚀
+              </Text>
+            </LinearGradient>
           </View>
           {onOpenProfile && (
             <TouchableOpacity
@@ -160,8 +165,8 @@ export function FloatingSearchBar({
                 style={[
                   styles.profileIconCircle,
                   {
-                    backgroundColor: isDark ? 'rgba(56, 189, 248, 0.18)' : '#e0f2fe',
-                    borderColor: isDark ? '#38bdf8' : '#0284c7',
+                    backgroundColor: isDark ? 'rgba(56, 189, 248, 0.2)' : SkyColors.sky100,
+                    borderColor: isDark ? SkyColors.sky400 : SkyColors.sky600,
                   },
                 ]}>
                 <Text style={styles.profileIconText}>👤</Text>
@@ -175,8 +180,8 @@ export function FloatingSearchBar({
           style={[
             styles.searchPill,
             {
-              backgroundColor: isDark ? 'rgba(15, 23, 42, 0.96)' : '#ffffff',
-              borderColor: isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.08)',
+              backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+              borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
             },
           ]}>
           {/* Search Icon */}
@@ -188,20 +193,20 @@ export function FloatingSearchBar({
           <TextInput
             style={[
               styles.input,
-              { color: isDark ? '#f8fafc' : '#0f172a' },
+              { color: '#000000' },
             ]}
             value={query}
             onChangeText={handleQueryChange}
             onFocus={() => setIsFocused(true)}
             placeholder="Search destination..."
-            placeholderTextColor={isDark ? '#94a3b8' : '#64748b'}
+            placeholderTextColor="#64748b"
             returnKeyType="search"
             autoCorrect={false}
           />
 
           {/* Loading Spinner */}
           {isLoading && (
-            <ActivityIndicator size="small" color="#38bdf8" style={styles.loader} />
+            <ActivityIndicator size="small" color={SkyColors.sky400} style={styles.loader} />
           )}
 
           {/* Clear Button */}
@@ -211,8 +216,8 @@ export function FloatingSearchBar({
               onPress={handleClear}
               activeOpacity={0.7}
               accessibilityLabel="Clear search">
-              <View style={[styles.clearCircle, { backgroundColor: isDark ? '#334155' : '#e2e8f0' }]}>
-                <Text style={[styles.clearIcon, { color: isDark ? '#cbd5e1' : '#475569' }]}>✕</Text>
+              <View style={[styles.clearCircle, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.2)' : SkyColors.sky100 }]}>
+                <Text style={[styles.clearIcon, { color: '#000000' }]}>✕</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -229,7 +234,7 @@ export function FloatingSearchBar({
                 borderWidth: 1,
                 borderColor: 'rgba(56, 189, 248, 0.3)',
               }}>
-              <Text style={{ color: '#38bdf8', fontSize: 11, fontWeight: '700' }}>
+              <Text style={{ color: '#000000', fontSize: 11, fontWeight: '700' }}>
                 {userName}
               </Text>
             </View>
@@ -246,8 +251,8 @@ export function FloatingSearchBar({
                 style={[
                   styles.profileIconCircle,
                   {
-                    backgroundColor: isDark ? 'rgba(56, 189, 248, 0.18)' : '#e0f2fe',
-                    borderColor: isDark ? '#38bdf8' : '#0284c7',
+                    backgroundColor: isDark ? 'rgba(56, 189, 248, 0.2)' : SkyColors.sky100,
+                    borderColor: isDark ? SkyColors.sky400 : SkyColors.sky600,
                   },
                 ]}>
                 <Text style={styles.profileIconText}>👤</Text>
@@ -263,8 +268,8 @@ export function FloatingSearchBar({
           style={[
             styles.suggestionsDropdown,
             {
-              backgroundColor: isDark ? 'rgba(15, 23, 42, 0.98)' : '#ffffff',
-              borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+              backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+              borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
             },
           ]}>
           <ScrollView
@@ -283,12 +288,12 @@ export function FloatingSearchBar({
                     styles.suggestionRow,
                     index < suggestions.length - 1 && {
                       borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                      borderBottomColor: isDark ? 'rgba(56, 189, 248, 0.15)' : SkyColors.sky100,
                     },
                   ]}
                   onPress={() => handleSelectSuggestion(item)}
                   activeOpacity={0.7}>
-                  <View style={[styles.pinIconCircle, { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}>
+                  <View style={[styles.pinIconCircle, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.18)' : SkyColors.sky100 }]}>
                     <Text style={{ fontSize: 13 }}>📍</Text>
                   </View>
                   <View style={styles.suggestionTextCol}>
@@ -296,7 +301,7 @@ export function FloatingSearchBar({
                       numberOfLines={1}
                       style={[
                         styles.suggestionTitle,
-                        { color: isDark ? '#f8fafc' : '#0f172a' },
+                        { color: '#000000' },
                       ]}>
                       {title}
                     </Text>
@@ -305,7 +310,7 @@ export function FloatingSearchBar({
                         numberOfLines={1}
                         style={[
                           styles.suggestionSubtitle,
-                          { color: isDark ? '#94a3b8' : '#64748b' },
+                          { color: '#1f2937' },
                         ]}>
                         {subtitle}
                       </Text>

@@ -13,8 +13,11 @@ import {
   Platform,
   RefreshControl,
 } from 'react-native';
+import { User, User2 } from "lucide-react";
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from '@/components/common/LinearGradient';
+import { SkyColors, SkyGradients } from '@/constants/theme';
 import { useAuth } from '@/services/authContext';
 import {
   FeedbackItem,
@@ -214,7 +217,7 @@ export default function FeedbackScreen() {
   const totalResolved = feedbacks.filter((f) => f.is_solved).length;
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#090d16' : '#f8fafc' }]}>
+    <View style={[styles.container, { backgroundColor: '#ffffff' }]}>
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
@@ -228,23 +231,25 @@ export default function FeedbackScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => fetchFeedbacks(true)}
-            tintColor="#38bdf8"
+            tintColor={SkyColors.sky400}
           />
         }>
-        
+
+        {/* <User2/> */}
+
         {/* Top Nav Row */}
         <View style={styles.topNavRow}>
           <TouchableOpacity
             style={styles.backBtn}
             onPress={() => router.back()}
             activeOpacity={0.7}>
-            <Text style={styles.backBtnText}>← Back</Text>
+            <Text style={[styles.backBtnText, { color: '#2C5EAD' }]}>← Back</Text>
           </TouchableOpacity>
-          <Text style={[styles.screenTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+          <Text style={[styles.screenTitle, { color: '#000000' }]}>
             Feedback & Bugs
           </Text>
           <TouchableOpacity
-            style={[styles.newBtn, { opacity: isGuest ? 0.6 : 1 }]}
+            style={{ borderRadius: 20, overflow: 'hidden', opacity: isGuest ? 0.6 : 1 }}
             onPress={() => {
               if (isGuest) {
                 router.push('/login');
@@ -253,7 +258,13 @@ export default function FeedbackScreen() {
               }
             }}
             activeOpacity={0.8}>
-            <Text style={styles.newBtnText}>+ New</Text>
+            <LinearGradient
+              colors={SkyGradients.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.newBtn}>
+              <Text style={styles.newBtnText}>+ New</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -263,7 +274,7 @@ export default function FeedbackScreen() {
             style={[
               styles.guestCard,
               {
-                backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : '#ffffff',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
                 borderColor: '#f59e0b',
               },
             ]}>
@@ -271,10 +282,10 @@ export default function FeedbackScreen() {
               <Text style={{ fontSize: 24 }}>💡</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.guestCardTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+              <Text style={[styles.guestCardTitle, { color: '#000000' }]}>
                 Guest Session
               </Text>
-              <Text style={[styles.guestCardSub, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+              <Text style={[styles.guestCardSub, { color: '#000000' }]}>
                 Log in or create an account to report issues, suggest features, and track status.
               </Text>
               <View style={styles.guestActionsRow}>
@@ -299,49 +310,55 @@ export default function FeedbackScreen() {
             style={[
               styles.overviewCard,
               {
-                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : '#ffffff',
-                borderColor: isDark ? 'rgba(56, 189, 248, 0.25)' : 'rgba(2, 132, 199, 0.2)',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
               },
             ]}>
             <View style={styles.overviewHeader}>
               <View>
-                <Text style={[styles.overviewUser, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                <Text style={[styles.overviewUser, { color: '#000000' }]}>
                   {user?.username || 'Navigator'}
                 </Text>
-                <Text style={[styles.overviewEmail, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                <Text style={[styles.overviewEmail, { color: '#000000' }]}>
                   {user?.email}
                 </Text>
               </View>
               <TouchableOpacity
-                style={styles.createReportHeaderBtn}
+                style={{ borderRadius: 14, overflow: 'hidden' }}
                 onPress={() => setShowCreateModal(true)}
                 activeOpacity={0.85}>
-                <Text style={styles.createReportHeaderBtnText}>+ Write Report</Text>
+                <LinearGradient
+                  colors={SkyGradients.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.createReportHeaderBtn}>
+                  <Text style={styles.createReportHeaderBtnText}>+ Write Report</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.statsRow}>
+            <View style={[styles.statsRow, { borderTopColor: isDark ? 'rgba(56, 189, 248, 0.15)' : SkyColors.sky100 }]}>
               <View style={styles.statBox}>
-                <Text style={[styles.statNumber, { color: '#38bdf8' }]}>{feedbacks.length}</Text>
+                <Text style={[styles.statNumber, { color: SkyColors.sky400 }]}>{feedbacks.length}</Text>
                 <Text style={[styles.statLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
                   Total
                 </Text>
               </View>
-              <View style={[styles.statDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0' }]} />
+              <View style={[styles.statDivider, { backgroundColor: isDark ? SkyColors.skyBorderDark : SkyColors.sky200 }]} />
               <View style={styles.statBox}>
-                <Text style={[styles.statNumber, { color: '#ef4444' }]}>{totalBugs}</Text>
+                <Text style={[styles.statNumber, { color: '#E45742' }]}>{totalBugs}</Text>
                 <Text style={[styles.statLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
                   Bugs
                 </Text>
               </View>
-              <View style={[styles.statDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0' }]} />
+              <View style={[styles.statDivider, { backgroundColor: isDark ? SkyColors.skyBorderDark : SkyColors.sky200 }]} />
               <View style={styles.statBox}>
-                <Text style={[styles.statNumber, { color: '#0ea5e9' }]}>{totalSuggestions}</Text>
+                <Text style={[styles.statNumber, { color: '#2C5EAD' }]}>{totalSuggestions}</Text>
                 <Text style={[styles.statLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
                   Ideas
                 </Text>
               </View>
-              <View style={[styles.statDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0' }]} />
+              <View style={[styles.statDivider, { backgroundColor: isDark ? SkyColors.skyBorderDark : SkyColors.sky200 }]} />
               <View style={styles.statBox}>
                 <Text style={[styles.statNumber, { color: '#10b981' }]}>{totalResolved}</Text>
                 <Text style={[styles.statLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
@@ -358,7 +375,10 @@ export default function FeedbackScreen() {
             style={[
               styles.filterPill,
               filter === 'all' && styles.filterPillActive,
-              { borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)' },
+              {
+                backgroundColor: filter === 'all' ? SkyColors.sky500 : isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: filter === 'all' ? SkyColors.sky500 : isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
+              },
             ]}
             onPress={() => setFilter('all')}
             activeOpacity={0.7}>
@@ -375,7 +395,10 @@ export default function FeedbackScreen() {
             style={[
               styles.filterPill,
               filter === 'bugs' && styles.filterPillActiveBug,
-              { borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)' },
+              {
+                backgroundColor: filter === 'bugs' ? '#E45742' : isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: filter === 'bugs' ? '#E45742' : isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
+              },
             ]}
             onPress={() => setFilter('bugs')}
             activeOpacity={0.7}>
@@ -392,7 +415,10 @@ export default function FeedbackScreen() {
             style={[
               styles.filterPill,
               filter === 'suggestions' && styles.filterPillActiveIdea,
-              { borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)' },
+              {
+                backgroundColor: filter === 'suggestions' ? SkyColors.sky500 : isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: filter === 'suggestions' ? SkyColors.sky500 : isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
+              },
             ]}
             onPress={() => setFilter('suggestions')}
             activeOpacity={0.7}>
@@ -409,7 +435,7 @@ export default function FeedbackScreen() {
         {/* Loading Spinner */}
         {loading && (
           <View style={styles.loadingWrapper}>
-            <ActivityIndicator size="large" color="#38bdf8" />
+            <ActivityIndicator size="large" color={SkyColors.sky400} />
             <Text style={[styles.loadingText, { color: isDark ? '#94a3b8' : '#64748b' }]}>
               Loading feedback submissions...
             </Text>
@@ -422,24 +448,30 @@ export default function FeedbackScreen() {
             style={[
               styles.emptyCard,
               {
-                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.6)' : '#ffffff',
-                borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
               },
             ]}>
             <Text style={styles.emptyIcon}>📝</Text>
-            <Text style={[styles.emptyTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+            <Text style={[styles.emptyTitle, { color: '#000000' }]}>
               No feedback entries found
             </Text>
-            <Text style={[styles.emptySub, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+            <Text style={[styles.emptySub, { color: '#000000' }]}>
               {filter === 'all'
                 ? 'Encountered an issue with offline dead reckoning or have a suggestion? Share it with the development team!'
                 : `No reports matching the '${filter}' filter.`}
             </Text>
             <TouchableOpacity
-              style={styles.emptyActionBtn}
+              style={{ borderRadius: 14, overflow: 'hidden' }}
               onPress={() => setShowCreateModal(true)}
               activeOpacity={0.85}>
-              <Text style={styles.emptyActionBtnText}>Submit New Feedback</Text>
+              <LinearGradient
+                colors={SkyGradients.primary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.emptyActionBtn}>
+                <Text style={styles.emptyActionBtnText}>Submit New Feedback</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         )}
@@ -451,10 +483,10 @@ export default function FeedbackScreen() {
             const isSolved = Boolean(item.is_solved);
             const formattedDate = item.created_at
               ? new Date(item.created_at).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })
               : 'Recently';
 
             return (
@@ -463,10 +495,10 @@ export default function FeedbackScreen() {
                 style={[
                   styles.feedbackCard,
                   {
-                    backgroundColor: isDark ? 'rgba(15, 23, 42, 0.9)' : '#ffffff',
+                    backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
                     borderColor: isBugReport
-                      ? 'rgba(239, 68, 68, 0.3)'
-                      : 'rgba(56, 189, 248, 0.3)',
+                      ? 'rgba(239, 68, 68, 0.4)'
+                      : isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
                   },
                 ]}>
                 {/* Header Row */}
@@ -517,12 +549,12 @@ export default function FeedbackScreen() {
                 </View>
 
                 {/* Feedback Body */}
-                <Text style={[styles.cardBodyText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                <Text style={[styles.cardBodyText, { color: '#000000' }]}>
                   {item.feedback_text}
                 </Text>
 
                 {/* Card Actions Footer */}
-                <View style={[styles.cardFooter, { borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9' }]}>
+                <View style={[styles.cardFooter, { borderTopColor: isDark ? 'rgba(56, 189, 248, 0.15)' : SkyColors.sky100 }]}>
                   <Text style={[styles.feedbackIdText, { color: isDark ? '#64748b' : '#94a3b8' }]}>
                     ID #{item.feedback_id}
                   </Text>
@@ -558,18 +590,18 @@ export default function FeedbackScreen() {
             style={[
               styles.modalCard,
               {
-                backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                borderColor: isDark ? 'rgba(56, 189, 248, 0.3)' : 'rgba(0,0,0,0.1)',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
               },
             ]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+              <Text style={[styles.modalTitle, { color: '#000000' }]}>
                 Submit Feedback
               </Text>
               <TouchableOpacity
                 onPress={() => setShowCreateModal(false)}
                 style={styles.modalCloseBtn}>
-                <Text style={{ fontSize: 18, color: isDark ? '#94a3b8' : '#64748b' }}>✕</Text>
+                <Text style={{ fontSize: 18, color: '#000000' }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -579,7 +611,7 @@ export default function FeedbackScreen() {
                 style={[
                   styles.typeOptionBtn,
                   isBug && styles.typeOptionBtnActiveBug,
-                  { borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0' },
+                  { borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight },
                 ]}
                 onPress={() => setIsBug(true)}
                 activeOpacity={0.8}>
@@ -596,7 +628,7 @@ export default function FeedbackScreen() {
                 style={[
                   styles.typeOptionBtn,
                   !isBug && styles.typeOptionBtnActiveIdea,
-                  { borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0' },
+                  { borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight },
                 ]}
                 onPress={() => setIsBug(false)}
                 activeOpacity={0.8}>
@@ -621,15 +653,15 @@ export default function FeedbackScreen() {
                   style={[
                     styles.chipItem,
                     {
-                      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9',
-                      borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#cbd5e1',
+                      backgroundColor: isDark ? 'rgba(56, 189, 248, 0.1)' : SkyColors.sky50,
+                      borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.sky200,
                     },
                   ]}
                   onPress={() => {
                     setFeedbackText((prev) => (prev ? `${prev} [${cat}] ` : `[${cat}] `));
                   }}
                   activeOpacity={0.7}>
-                  <Text style={[styles.chipText, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+                  <Text style={[styles.chipText, { color: isDark ? SkyColors.sky300 : SkyColors.sky700 }]}>
                     {cat}
                   </Text>
                 </TouchableOpacity>
@@ -641,9 +673,9 @@ export default function FeedbackScreen() {
               style={[
                 styles.feedbackInput,
                 {
-                  backgroundColor: isDark ? '#090d16' : '#f8fafc',
-                  color: isDark ? '#f8fafc' : '#0f172a',
-                  borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
+                  backgroundColor: isDark ? SkyColors.skyNight : SkyColors.sky50,
+                  color: '#000000',
+                  borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.sky200,
                 },
               ]}
               multiline
@@ -667,28 +699,31 @@ export default function FeedbackScreen() {
             {/* Modal Actions */}
             <View style={styles.modalActionRow}>
               <TouchableOpacity
-                style={[styles.modalCancelBtn, { borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1' }]}
+                style={[styles.modalCancelBtn, { borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.sky200 }]}
                 onPress={() => setShowCreateModal(false)}
                 disabled={submitting}
                 activeOpacity={0.7}>
-                <Text style={[styles.modalCancelText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                <Text style={[styles.modalCancelText, { color: '#000000' }]}>
                   Cancel
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.modalSubmitBtn,
-                  { backgroundColor: isBug ? '#ef4444' : '#0284c7' },
-                ]}
+                style={{ flex: 1.5, height: 44, borderRadius: 14, overflow: 'hidden' }}
                 onPress={handleSubmitFeedback}
                 disabled={submitting}
                 activeOpacity={0.85}>
-                {submitting ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.modalSubmitText}>Submit Report</Text>
-                )}
+                <LinearGradient
+                  colors={isBug ? ['#ef4444', '#dc2626'] : SkyGradients.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalSubmitBtn}>
+                  {submitting ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.modalSubmitText}>Submit Report</Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -706,18 +741,18 @@ export default function FeedbackScreen() {
             style={[
               styles.modalCard,
               {
-                backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                borderColor: isDark ? 'rgba(56, 189, 248, 0.3)' : 'rgba(0,0,0,0.1)',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
               },
             ]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+              <Text style={[styles.modalTitle, { color: '#000000' }]}>
                 Edit Feedback #{editingItem?.feedback_id}
               </Text>
               <TouchableOpacity
                 onPress={() => setEditingItem(null)}
                 style={styles.modalCloseBtn}>
-                <Text style={{ fontSize: 18, color: isDark ? '#94a3b8' : '#64748b' }}>✕</Text>
+                <Text style={{ fontSize: 18, color: '#000000' }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -727,7 +762,7 @@ export default function FeedbackScreen() {
                 style={[
                   styles.typeOptionBtn,
                   editIsBug && styles.typeOptionBtnActiveBug,
-                  { borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0' },
+                  { borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight },
                 ]}
                 onPress={() => setEditIsBug(true)}
                 activeOpacity={0.8}>
@@ -744,7 +779,7 @@ export default function FeedbackScreen() {
                 style={[
                   styles.typeOptionBtn,
                   !editIsBug && styles.typeOptionBtnActiveIdea,
-                  { borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0' },
+                  { borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight },
                 ]}
                 onPress={() => setEditIsBug(false)}
                 activeOpacity={0.8}>
@@ -762,20 +797,20 @@ export default function FeedbackScreen() {
               style={[
                 styles.feedbackInput,
                 {
-                  backgroundColor: isDark ? '#090d16' : '#f8fafc',
-                  color: isDark ? '#f8fafc' : '#0f172a',
-                  borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1',
+                  backgroundColor: isDark ? SkyColors.skyNight : SkyColors.sky50,
+                  color: '#000000',
+                  borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.sky200,
                 },
               ]}
               multiline
               numberOfLines={5}
               placeholder="Update your feedback..."
-              placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+              placeholderTextColor="#64748b"
               value={editText}
               onChangeText={setEditText}
               maxLength={1000}
             />
-            <Text style={[styles.charCount, { color: isDark ? '#64748b' : '#94a3b8' }]}>
+            <Text style={[styles.charCount, { color: '#64748b' }]}>
               {editText.length}/1000 characters
             </Text>
 
@@ -784,25 +819,31 @@ export default function FeedbackScreen() {
             {/* Modal Actions */}
             <View style={styles.modalActionRow}>
               <TouchableOpacity
-                style={[styles.modalCancelBtn, { borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1' }]}
+                style={[styles.modalCancelBtn, { borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.sky200 }]}
                 onPress={() => setEditingItem(null)}
                 disabled={updating}
                 activeOpacity={0.7}>
-                <Text style={[styles.modalCancelText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                <Text style={[styles.modalCancelText, { color: '#000000' }]}>
                   Cancel
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, { backgroundColor: '#0284c7' }]}
+                style={{ flex: 1.5, height: 44, borderRadius: 14, overflow: 'hidden' }}
                 onPress={handleUpdateFeedback}
                 disabled={updating}
                 activeOpacity={0.85}>
-                {updating ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.modalSubmitText}>Save Changes</Text>
-                )}
+                <LinearGradient
+                  colors={editIsBug ? ['#ef4444', '#dc2626'] : SkyGradients.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalSubmitBtn}>
+                  {updating ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.modalSubmitText}>Save Changes</Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -846,10 +887,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   newBtn: {
-    backgroundColor: '#0284c7',
     paddingVertical: 7,
     paddingHorizontal: 16,
-    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   newBtnText: {
     color: '#ffffff',
@@ -941,15 +982,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   createReportHeaderBtn: {
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
     paddingVertical: 7,
     paddingHorizontal: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#38bdf8',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   createReportHeaderBtnText: {
-    color: '#38bdf8',
+    color: '#ffffff',
     fontSize: 12.5,
     fontWeight: '800',
   },
@@ -1042,10 +1081,10 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   emptyActionBtn: {
-    backgroundColor: '#0284c7',
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyActionBtnText: {
     color: '#ffffff',
@@ -1190,12 +1229,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   typeOptionBtnActiveBug: {
-    backgroundColor: '#ef4444',
-    borderColor: '#ef4444',
+    backgroundColor: '#E45742',
+    borderColor: '#E45742',
   },
   typeOptionBtnActiveIdea: {
-    backgroundColor: '#0284c7',
-    borderColor: '#0284c7',
+    backgroundColor: '#2C5EAD',
+    borderColor: '#2C5EAD',
   },
   typeOptionText: {
     fontSize: 13,
@@ -1237,7 +1276,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   errorText: {
-    color: '#ef4444',
+    color: '#E45742',
     fontSize: 12,
     fontWeight: '600',
     marginBottom: 10,
@@ -1260,9 +1299,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   modalSubmitBtn: {
-    flex: 1.5,
-    height: 44,
-    borderRadius: 14,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -9,17 +9,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  useColorScheme,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from '@/components/common/LinearGradient';
+import { SkyColors, SkyGradients } from '@/constants/theme';
 import { useAuth } from '@/services/authContext';
 
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { login, continueAsGuest } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -61,7 +61,7 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: isDark ? '#090d16' : '#0f172a' }]}
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         contentContainerStyle={[
@@ -72,12 +72,24 @@ export default function LoginScreen() {
 
         {/* Top Header / Brand */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.guestPill} onPress={handleGuestBack} activeOpacity={0.8}>
-            <Text style={styles.guestPillText}>← Back to Map (Guest)</Text>
+          <TouchableOpacity
+            style={styles.guestPill}
+            onPress={handleGuestBack}
+            activeOpacity={0.8}>
+            <Text style={styles.guestPillText}>
+              ← Back to Map (Guest)
+            </Text>
           </TouchableOpacity>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoIcon}>📍</Text>
+
+          {/* Circular Logo View */}
+          <View style={styles.circularLogoContainer}>
+            <Image
+              source={require('@/assets/images/logo.jpg')}
+              style={styles.circularLogoImage}
+              resizeMode="cover"
+            />
           </View>
+
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>
             Log in to continue navigating, search locations, and access Dead Reckoning.
@@ -85,15 +97,8 @@ export default function LoginScreen() {
         </View>
 
         {/* Card Form */}
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: isDark ? 'rgba(15, 23, 42, 0.85)' : 'rgba(30, 41, 59, 0.95)',
-              borderColor: 'rgba(56, 189, 248, 0.25)',
-            },
-          ]}>
-          {/* Error Message */}
+        <View style={styles.card}>
+          {/* Danger Error Message */}
           {errorMessage ? (
             <View style={styles.errorBanner}>
               <Text style={styles.errorIcon}>⚠️</Text>
@@ -109,7 +114,7 @@ export default function LoginScreen() {
               <TextInput
                 style={styles.textInput}
                 placeholder="name@example.com"
-                placeholderTextColor="#64748b"
+                placeholderTextColor="#6b7280"
                 value={email}
                 onChangeText={(val) => {
                   setEmail(val);
@@ -129,8 +134,8 @@ export default function LoginScreen() {
               <Text style={styles.fieldIcon}>🔒</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="Enter your password"
-                placeholderTextColor="#64748b"
+                placeholder="Enter password"
+                placeholderTextColor="#6b7280"
                 value={password}
                 onChangeText={(val) => {
                   setPassword(val);
@@ -138,27 +143,34 @@ export default function LoginScreen() {
                 }}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
+                autoCorrect={false}
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeBtn}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
+                activeOpacity={0.7}>
+                <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '🙈'}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Log In Button */}
+          {/* Primary Action Button (#2C5EAD) */}
           <TouchableOpacity
-            style={[styles.primaryBtn, isLoading && { opacity: 0.7 }]}
+            style={styles.primaryBtnWrapper}
             onPress={handleLogin}
             disabled={isLoading}
             activeOpacity={0.85}>
-            {isLoading ? (
-              <ActivityIndicator color="#ffffff" size="small" />
-            ) : (
-              <Text style={styles.primaryBtnText}>Log In</Text>
-            )}
+            <LinearGradient
+              colors={SkyGradients.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.primaryBtnGradient}>
+              {isLoading ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text style={styles.primaryBtnText}>Log In</Text>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
 
           {/* Sign Up Redirection Option */}
@@ -185,60 +197,64 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#ffffff',
   },
   scrollContainer: {
     paddingHorizontal: 22,
     alignItems: 'center',
   },
   header: {
-    width: '100%',
     alignItems: 'center',
     marginBottom: 24,
+    width: '100%',
   },
   guestPill: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 16,
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    paddingHorizontal: 14,
     borderRadius: 20,
-    marginBottom: 18,
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: '#e2e8f0',
   },
   guestPillText: {
-    color: '#94a3b8',
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2C5EAD',
   },
-  logoBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(2, 132, 199, 0.2)',
-    borderWidth: 2,
-    borderColor: '#38bdf8',
+  circularLogoContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: '#2C5EAD',
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
-    shadowColor: '#38bdf8',
+    shadowColor: '#2C5EAD',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.25,
     shadowRadius: 10,
-    elevation: 8,
+    elevation: 6,
+    marginBottom: 14,
   },
-  logoIcon: {
-    fontSize: 32,
+  circularLogoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 48,
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#f8fafc',
+    color: '#000000',
     textAlign: 'center',
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#000000',
     textAlign: 'center',
     marginTop: 6,
     lineHeight: 20,
@@ -249,21 +265,23 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     borderRadius: 24,
     borderWidth: 1,
+    borderColor: 'rgba(44, 94, 173, 0.14)',
+    backgroundColor: '#ffffff',
     padding: 22,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 5,
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    backgroundColor: SkyColors.dangerBg,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.4)',
+    borderColor: SkyColors.dangerBorder,
     borderRadius: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     paddingHorizontal: 12,
     marginBottom: 16,
     gap: 8,
@@ -273,9 +291,9 @@ const styles = StyleSheet.create({
   },
   errorText: {
     flex: 1,
-    color: '#fca5a5',
+    color: '#E45742',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   inputGroup: {
     marginBottom: 18,
@@ -283,17 +301,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#cbd5e1',
+    color: '#000000',
     marginBottom: 6,
     letterSpacing: 0.2,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: '#f8fafc',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: '#e2e8f0',
     paddingHorizontal: 12,
     height: 48,
   },
@@ -303,7 +321,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    color: '#ffffff',
+    color: '#000000',
     fontSize: 15,
     paddingVertical: 0,
   },
@@ -313,18 +331,21 @@ const styles = StyleSheet.create({
   eyeIcon: {
     fontSize: 16,
   },
-  primaryBtn: {
-    backgroundColor: '#0284c7',
+  primaryBtnWrapper: {
     borderRadius: 16,
     height: 50,
+    overflow: 'hidden',
+    marginTop: 10,
+    shadowColor: '#2C5EAD',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  primaryBtnGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
-    shadowColor: '#0284c7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 6,
   },
   primaryBtnText: {
     color: '#ffffff',
@@ -340,32 +361,32 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   footerQuestion: {
-    color: '#94a3b8',
+    color: '#000000',
     fontSize: 14,
   },
   footerLink: {
-    color: '#38bdf8',
+    color: '#2C5EAD',
     fontSize: 14,
     fontWeight: '700',
   },
   demoBox: {
     width: '100%',
     maxWidth: 420,
-    marginTop: 28,
+    marginTop: 24,
     padding: 16,
     borderRadius: 16,
-    backgroundColor: 'rgba(56, 189, 248, 0.08)',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.2)',
+    borderColor: 'rgba(44, 94, 173, 0.12)',
   },
   demoTitle: {
-    color: '#38bdf8',
+    color: '#2C5EAD',
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 4,
   },
   demoText: {
-    color: '#94a3b8',
+    color: '#000000',
     fontSize: 12,
     lineHeight: 18,
   },

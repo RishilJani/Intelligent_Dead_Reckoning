@@ -18,7 +18,7 @@ export function getMapHtml(): string {
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #090d16; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
     
     #map-wrapper {
       width: 100%;
@@ -42,24 +42,28 @@ export function getMapHtml(): string {
 
     /* Tile Grid Overlay for Valhalla Routing Graph Tiles */
     .valhalla-tile-grid {
-      border: 1px dashed rgba(249, 115, 22, 0.65);
-      background-color: rgba(249, 115, 22, 0.03);
-      color: #ea580c;
-      font-size: 11px;
-      font-weight: 700;
+      border: 1px dashed rgba(72, 219, 251, 0.65);
+      position: relative;
+    }
+    .valhalla-tile-label-wrap {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      z-index: 500;
       padding: 4px 6px;
       pointer-events: none;
       text-shadow: 0 1px 2px rgba(0,0,0,0.8);
     }
     .valhalla-tile-label {
-      background: rgba(15, 23, 42, 0.9);
-      color: #38bdf8;
+      background: rgba(18, 37, 61, 0.92);
+      color: #48dbfb;
       padding: 2px 6px;
       border-radius: 4px;
       font-family: monospace;
       font-size: 10px;
       display: inline-block;
       box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      border: 1px solid rgba(72, 219, 251, 0.35);
     }
     
     /* Modern Map Pins */
@@ -79,13 +83,13 @@ export function getMapHtml(): string {
       transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
     .marker-start { background: linear-gradient(135deg, #10b981, #059669); }
-    .marker-end { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .marker-end { background: linear-gradient(135deg, #E45742, #C73824); }
     .marker-vehicle {
-      background: linear-gradient(135deg, #0284c7, #1d4ed8);
+      background: linear-gradient(135deg, #2C5EAD, #3B75D4);
       border-radius: 50%;
       width: 46px;
       height: 46px;
-      box-shadow: 0 0 28px rgba(2, 132, 199, 0.95);
+      box-shadow: 0 0 24px rgba(44, 94, 173, 0.75);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -99,9 +103,9 @@ export function getMapHtml(): string {
       width: 32px;
       height: 32px;
       border-radius: 16px;
-      background: rgba(15, 23, 42, 0.92);
-      border: 2px solid #38bdf8;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      background: #ffffff;
+      border: 2px solid #2C5EAD;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -109,16 +113,16 @@ export function getMapHtml(): string {
       cursor: pointer;
       transition: transform 0.2s;
     }
-    .poi-marker:hover, .poi-marker:active { transform: scale(1.2); border-color: #f59e0b; }
+    .poi-marker:hover, .poi-marker:active { transform: scale(1.2); border-color: #3B75D4; }
 
     /* Live GPS Radar Marker */
     .gps-marker {
       width: 22px;
       height: 22px;
-      background: #0284c7;
+      background: #54a0ff;
       border: 3px solid #ffffff;
       border-radius: 50%;
-      box-shadow: 0 0 12px rgba(2, 132, 199, 0.9);
+      box-shadow: 0 0 16px rgba(72, 219, 251, 0.95);
       position: relative;
     }
     .gps-radar-ring {
@@ -128,7 +132,7 @@ export function getMapHtml(): string {
       width: 36px;
       height: 36px;
       border-radius: 50%;
-      background: rgba(2, 132, 199, 0.35);
+      background: rgba(72, 219, 251, 0.35);
       animation: radar-pulse 2s infinite ease-out;
     }
     @keyframes radar-pulse {
@@ -138,19 +142,20 @@ export function getMapHtml(): string {
 
     /* Popups */
     .leaflet-popup-content-wrapper {
-      background: rgba(15, 23, 42, 0.95);
+      background: #ffffff;
       backdrop-filter: blur(10px);
-      color: #f8fafc;
+      color: #0f172a;
       border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(44, 94, 173, 0.2);
       padding: 2px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
     }
     .leaflet-popup-content { margin: 10px 14px; line-height: 1.4; }
-    .popup-title { font-weight: 700; color: #38bdf8; margin-bottom: 2px; font-size: 13px; }
-    .popup-sub { color: #94a3b8; font-size: 11px; margin-bottom: 6px; }
+    .popup-title { font-weight: 700; color: #2C5EAD; margin-bottom: 2px; font-size: 13px; }
+    .popup-sub { color: #64748b; font-size: 11px; margin-bottom: 6px; }
     .popup-btn {
       display: inline-block;
-      background: #0284c7;
+      background: linear-gradient(135deg, #2C5EAD, #3B75D4);
       color: #ffffff;
       font-weight: 700;
       font-size: 11px;
@@ -169,9 +174,9 @@ export function getMapHtml(): string {
       bottom: 20px;
       left: 20px;
       z-index: 1000;
-      background: rgba(15, 23, 42, 0.92);
+      background: #ffffff;
       backdrop-filter: blur(10px);
-      border: 1.5px solid rgba(56, 189, 248, 0.4);
+      border: 1.5px solid rgba(44, 94, 173, 0.35);
       border-radius: 50%;
       width: 68px;
       height: 68px;
@@ -179,10 +184,10 @@ export function getMapHtml(): string {
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
     }
-    .speed-val { font-size: 20px; font-weight: 900; color: #38bdf8; line-height: 1; }
-    .speed-unit { font-size: 8.5px; color: #94a3b8; font-weight: 700; }
+    .speed-val { font-size: 20px; font-weight: 900; color: #2C5EAD; line-height: 1; }
+    .speed-unit { font-size: 8.5px; color: #64748b; font-weight: 700; }
 
     /* Google Maps Animated Dotted Line & Road Start Node */
     .gmaps-dotted-line {

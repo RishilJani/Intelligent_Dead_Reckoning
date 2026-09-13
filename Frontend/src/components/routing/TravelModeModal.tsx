@@ -9,6 +9,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { CostingMode } from '@/types/navigation';
+import { SkyColors, SkyGradients } from '@/constants/theme';
 
 interface TravelModeOption {
   id: CostingMode;
@@ -26,7 +27,7 @@ const TRAVEL_MODES: TravelModeOption[] = [
     title: 'Drive / Car',
     subtitle: 'Highways, live traffic routing & fastest corridors',
     speed: '~45-80 km/h',
-    accentColor: '#0284c7',
+    accentColor: SkyColors.sky500,
   },
   {
     id: 'bicycle',
@@ -83,8 +84,8 @@ export function TravelModeModal({
               style={[
                 styles.bottomSheet,
                 {
-                  backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                  borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+                  backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                  borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
                 },
               ]}>
               {/* Handle Bar */}
@@ -93,20 +94,20 @@ export function TravelModeModal({
               {/* Title Header */}
               <View style={styles.headerRow}>
                 <View>
-                  <Text style={[styles.title, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                  <Text style={[styles.title, { color: '#000000' }]}>
                     Travel Modes
                   </Text>
-                  <Text style={[styles.subtitle, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+                  <Text style={[styles.subtitle, { color: '#1f2937' }]}>
                     Select routing graph & profile for Valhalla engine
                   </Text>
                 </View>
                 <TouchableOpacity
                   style={[
                     styles.closeBtn,
-                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9' },
+                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : SkyColors.sky50 },
                   ]}
                   onPress={onClose}>
-                  <Text style={{ fontSize: 14, color: isDark ? '#94a3b8' : '#64748b' }}>✕</Text>
+                  <Text style={{ fontSize: 14, color: '#000000' }}>✕</Text>
                 </TouchableOpacity>
               </View>
 
@@ -122,16 +123,16 @@ export function TravelModeModal({
                         {
                           backgroundColor: isSelected
                             ? isDark
-                              ? 'rgba(2, 132, 199, 0.18)'
-                              : '#e0f2fe'
+                              ? 'rgba(56, 189, 248, 0.18)'
+                              : SkyColors.sky100
                             : isDark
-                            ? '#1e293b'
+                            ? SkyColors.skySurfaceDark
                             : '#f8fafc',
                           borderColor: isSelected
-                            ? mode.accentColor
+                            ? (isDark ? SkyColors.sky400 : SkyColors.sky500)
                             : isDark
-                            ? 'rgba(255, 255, 255, 0.08)'
-                            : '#e2e8f0',
+                            ? SkyColors.skyBorderDark
+                            : SkyColors.skyBorderLight,
                         },
                       ]}
                       onPress={() => {
@@ -144,7 +145,7 @@ export function TravelModeModal({
                           styles.iconContainer,
                           {
                             backgroundColor: isSelected
-                              ? mode.accentColor
+                              ? (isDark ? SkyColors.sky500 : SkyColors.sky600)
                               : isDark
                               ? 'rgba(255, 255, 255, 0.06)'
                               : '#e2e8f0',
@@ -158,25 +159,25 @@ export function TravelModeModal({
                           <Text
                             style={[
                               styles.modeTitle,
-                              { color: isDark ? '#f8fafc' : '#0f172a' },
-                              isSelected && { color: mode.accentColor, fontWeight: '800' },
+                              { color: '#000000' },
+                              isSelected && { color: isDark ? SkyColors.sky400 : SkyColors.sky600, fontWeight: '800' },
                             ]}>
                             {mode.title}
                           </Text>
-                          <Text style={styles.speedBadge}>{mode.speed}</Text>
+                          <Text style={[styles.speedBadge, { color: isDark ? SkyColors.sky400 : SkyColors.sky600 }]}>{mode.speed}</Text>
                         </View>
                         <Text
                           numberOfLines={1}
                           style={[
                             styles.modeSubtitle,
-                            { color: isDark ? '#94a3b8' : '#64748b' },
+                            { color: '#1f2937' },
                           ]}>
                           {mode.subtitle}
                         </Text>
                       </View>
 
                       {isSelected && (
-                        <View style={[styles.selectedCheck, { backgroundColor: mode.accentColor }]}>
+                        <View style={[styles.selectedCheck, { backgroundColor: isDark ? SkyColors.sky400 : SkyColors.sky600 }]}>
                           <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>
                             ✓
                           </Text>
@@ -279,7 +280,7 @@ const styles = StyleSheet.create({
   speedBadge: {
     fontSize: 10.5,
     fontWeight: '700',
-    color: '#0284c7',
+    color: SkyColors.sky400,
   },
   modeSubtitle: {
     fontSize: 11,

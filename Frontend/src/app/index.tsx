@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, useColorScheme } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DisplayMap, DisplayMapHandle } from '@/components/displaymap/DisplayMap';
 import { MapControls } from '@/components/displaymap/MapControls';
@@ -21,6 +21,7 @@ import {
   MapTileLayerType,
   RouteStatistics,
 } from '@/types/navigation';
+import { SkyColors, SkyGradients } from '@/constants/theme';
 
 export default function NavigationScreen() {
   const router = useRouter();
@@ -141,9 +142,9 @@ export default function NavigationScreen() {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((userLat * Math.PI) / 180) *
-        Math.cos((selectedPlace.lat * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos((selectedPlace.lat * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const meters = R * c;
     if (meters < 1000) {
@@ -603,7 +604,7 @@ export default function NavigationScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#090d16' : '#f8fafc' }]}>
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.container, { backgroundColor: '#ffffff', paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       {/* 1. Full Screen Interactive Map with Base64 IndexedDB Tile Caching */}
       <DisplayMap ref={mapRef} onMapMessage={handleMapMessage} />
 
@@ -629,16 +630,34 @@ export default function NavigationScreen() {
 
       {/* 4. Startup GPS Locating / Route Calculating Status Overlays */}
       {isLocatingOnStartup && (
-        <View style={[styles.statusBanner, { top: Math.max(insets.top + 72, 80) }]}>
-          <ActivityIndicator size="small" color="#38bdf8" />
-          <Text style={styles.statusBannerText}>Acquiring Live GPS Location...</Text>
+        <View
+          style={[
+            styles.statusBanner,
+            {
+              top: Math.max(insets.top + 72, 80),
+              backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+              borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
+            },
+          ]}>
+          <ActivityIndicator size="small" color={SkyColors.sky400} />
+          <Text style={[styles.statusBannerText, { color: '#000000' }]}>
+            Acquiring Live GPS Location...
+          </Text>
         </View>
       )}
 
       {isLoadingRoute && !isLocatingOnStartup && (
-        <View style={[styles.statusBanner, { top: Math.max(insets.top + 72, 80) }]}>
-          <ActivityIndicator size="small" color="#38bdf8" />
-          <Text style={styles.statusBannerText}>
+        <View
+          style={[
+            styles.statusBanner,
+            {
+              top: Math.max(insets.top + 72, 80),
+              backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+              borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
+            },
+          ]}>
+          <ActivityIndicator size="small" color={SkyColors.sky400} />
+          <Text style={[styles.statusBannerText, { color: '#000000' }]}>
             {isOfflineMode ? 'Solving Offline Route...' : 'Calculating Valhalla Route...'}
           </Text>
         </View>
@@ -646,9 +665,9 @@ export default function NavigationScreen() {
 
       {/* 6. Offline Download Progress Banner */}
       {isDownloadingOffline && (
-        <View style={[styles.statusBanner, { bottom: 120, borderColor: '#f59e0b' }]}>
+        <View style={[styles.statusBanner, { bottom: 120, borderColor: '#f59e0b', backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff' }]}>
           <ActivityIndicator size="small" color="#f59e0b" />
-          <Text style={styles.statusBannerText}>
+          <Text style={[styles.statusBannerText, { color: '#000000' }]}>
             Downloading Offline Map Tiles... {downloadProgress}%
           </Text>
         </View>
@@ -712,7 +731,7 @@ export default function NavigationScreen() {
         onDownloadArea={handleDownloadArea}
         onClearCache={handleClearCache}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -724,25 +743,22 @@ const styles = StyleSheet.create({
   statusBanner: {
     position: 'absolute',
     alignSelf: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+    borderRadius: 22,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
     zIndex: 999,
-    shadowColor: '#000',
+    shadowColor: '#2C5EAD',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
     elevation: 8,
   },
   statusBannerText: {
-    color: '#f8fafc',
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '700',
   },
 });

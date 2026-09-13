@@ -1,5 +1,7 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, useColorScheme } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Text, useColorScheme } from 'react-native';
+import { LinearGradient } from '@/components/common/LinearGradient';
+import { SkyColors, SkyGradients } from '@/constants/theme';
 
 interface MapControlsProps {
   isLiveTracking: boolean;
@@ -33,23 +35,31 @@ export function MapControls({
             isLiveTracking && styles.activeGpsBtn,
             {
               backgroundColor: isLiveTracking
-                ? '#0284c7'
+                ? '#2C5EAD'
                 : isDark
-                ? 'rgba(15, 23, 42, 0.95)'
+                ? SkyColors.skyCardDark
                 : '#ffffff',
               borderColor: isLiveTracking
-                ? '#38bdf8'
+                ? SkyColors.sky400
                 : isDark
-                ? 'rgba(255, 255, 255, 0.16)'
-                : 'rgba(0, 0, 0, 0.1)',
+                ? SkyColors.skyBorderDark
+                : SkyColors.skyBorderLight,
             },
           ]}
           onPress={onCenterGPS}
           activeOpacity={0.8}
           accessibilityLabel="Re-locate to Current GPS">
-          <Text style={[styles.reLocateIcon, isLiveTracking && { color: '#ffffff' }]}>
-            🎯
-          </Text>
+          {isLiveTracking ? (
+            <LinearGradient
+              colors={SkyGradients.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.activeGpsGradient}>
+              <Text style={styles.reLocateIcon}>🎯</Text>
+            </LinearGradient>
+          ) : (
+            <Text style={styles.reLocateIcon}>🎯</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -92,6 +102,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 10,
     elevation: 9,
+    overflow: 'hidden',
+  },
+  activeGpsGradient: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 25,
   },
   reLocateIcon: {
     fontSize: 22,

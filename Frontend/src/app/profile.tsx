@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from '@/components/common/LinearGradient';
 import { useAuth } from '@/services/authContext';
 import { MapSettingsModal } from '@/components/settings/MapSettingsModal';
 import { MapTileLayerType } from '@/types/navigation';
+import { SkyColors, SkyGradients } from '@/constants/theme';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -36,7 +38,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#090d16' : '#f8fafc' }]}>
+    <View style={[styles.container, { backgroundColor: '#ffffff' }]}>
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
@@ -50,9 +52,9 @@ export default function ProfileScreen() {
         {/* Top Navigation Row */}
         <View style={styles.topNavRow}>
           <TouchableOpacity style={styles.backBtn} onPress={handleBackToMap} activeOpacity={0.7}>
-            <Text style={styles.backBtnText}>← Back to Map</Text>
+            <Text style={[styles.backBtnText, { color: '#2C5EAD' }]}>← Back to Map</Text>
           </TouchableOpacity>
-          <Text style={[styles.screenTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+          <Text style={[styles.screenTitle, { color: '#000000' }]}>
             User Profile
           </Text>
           <View style={{ width: 80 }} />
@@ -63,31 +65,42 @@ export default function ProfileScreen() {
           style={[
             styles.heroCard,
             {
-              backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : '#ffffff',
-              borderColor: isDark ? 'rgba(56, 189, 248, 0.25)' : 'rgba(2, 132, 199, 0.2)',
+              backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+              borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
             },
           ]}>
-          {/* Avatar Circle */}
-          <View
-            style={[
-              styles.avatarLarge,
-              {
-                backgroundColor: isGuest
-                  ? 'rgba(234, 179, 8, 0.15)'
-                  : 'rgba(2, 132, 199, 0.2)',
-                borderColor: isGuest ? '#f59e0b' : '#38bdf8',
-              },
-            ]}>
-            <Text style={styles.avatarLargeText}>
-              {isGuest ? '👤' : (user?.username ? user.username[0].toUpperCase() : '👤')}
-            </Text>
-          </View>
+          {/* Avatar Circle with Sky Gradient */}
+          {isGuest ? (
+            <View
+              style={[
+                styles.avatarLarge,
+                {
+                  backgroundColor: 'rgba(234, 179, 8, 0.15)',
+                  borderColor: '#f59e0b',
+                },
+              ]}>
+              <Text style={styles.avatarLargeText}>👤</Text>
+            </View>
+          ) : (
+            <View style={styles.avatarWrapper}>
+              <LinearGradient
+                colors={SkyGradients.radial1Colors}
+                radialPreset="radial1"
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarLargeGradient}>
+                <Text style={[styles.avatarLargeText, { color: '#ffffff' }]}>
+                  {user?.username ? user.username[0].toUpperCase() : '👤'}
+                </Text>
+              </LinearGradient>
+            </View>
+          )}
 
           {/* Name & Email */}
-          <Text style={[styles.userNameText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+          <Text style={[styles.userNameText, { color: '#000000' }]}>
             {isGuest ? 'Guest Explorer' : user?.username}
           </Text>
-          <Text style={[styles.userEmailText, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+          <Text style={[styles.userEmailText, { color: '#000000' }]}>
             {isGuest ? 'No account linked (Guest Mode)' : user?.email}
           </Text>
 
@@ -98,38 +111,38 @@ export default function ProfileScreen() {
               {
                 backgroundColor: isGuest
                   ? 'rgba(234, 179, 8, 0.15)'
-                  : 'rgba(16, 185, 129, 0.15)',
-                borderColor: isGuest ? 'rgba(234, 179, 8, 0.4)' : 'rgba(16, 185, 129, 0.4)',
+                  : 'rgba(56, 189, 248, 0.15)',
+                borderColor: isGuest ? 'rgba(234, 179, 8, 0.4)' : SkyColors.skyBorderDark,
               },
             ]}>
             <Text
               style={[
                 styles.statusBadgeText,
-                { color: isGuest ? '#f59e0b' : '#10b981' },
+                { color: isGuest ? '#f59e0b' : SkyColors.sky400 },
               ]}>
-              {isGuest ? '🟡 Guest Mode (Read Only)' : '🟢 Verified Explorer • Full Access'}
+              {isGuest ? '🟡 Guest Mode (Read Only)' : '✨ Verified Explorer • Full Access'}
             </Text>
           </View>
         </View>
 
         {/* Detailed User Information Card */}
         <View style={styles.sectionWrapper}>
-          <Text style={[styles.sectionHeading, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+          <Text style={[styles.sectionHeading, { color: '#2C5EAD' }]}>
             ACCOUNT DETAILS
           </Text>
           <View
             style={[
               styles.detailsCard,
               {
-                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.85)' : '#ffffff',
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
               },
             ]}>
             <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+              <Text style={[styles.detailLabel, { color: '#000000' }]}>
                 👤 Username
               </Text>
-              <Text style={[styles.detailValue, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+              <Text style={[styles.detailValue, { color: '#000000' }]}>
                 {isGuest ? 'Guest' : user?.username}
               </Text>
             </View>
@@ -137,10 +150,10 @@ export default function ProfileScreen() {
             <View style={[styles.detailDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9' }]} />
 
             <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+              <Text style={[styles.detailLabel, { color: '#000000' }]}>
                 ✉️ Email Address
               </Text>
-              <Text style={[styles.detailValue, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+              <Text style={[styles.detailValue, { color: '#000000' }]}>
                 {isGuest ? 'Not registered' : user?.email}
               </Text>
             </View>
@@ -148,7 +161,7 @@ export default function ProfileScreen() {
             <View style={[styles.detailDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9' }]} />
 
             <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+              <Text style={[styles.detailLabel, { color: '#000000' }]}>
                 🛡️ Account Status
               </Text>
               <Text style={[styles.detailValue, { color: isGuest ? '#f59e0b' : '#10b981' }]}>
@@ -159,10 +172,10 @@ export default function ProfileScreen() {
             <View style={[styles.detailDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9' }]} />
 
             <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+              <Text style={[styles.detailLabel, { color: '#000000' }]}>
                 🧭 Navigation Access
               </Text>
-              <Text style={[styles.detailValue, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+              <Text style={[styles.detailValue, { color: '#000000' }]}>
                 {isGuest ? 'Map View Only' : 'Search, Routing & Live Nav'}
               </Text>
             </View>
@@ -170,10 +183,10 @@ export default function ProfileScreen() {
             <View style={[styles.detailDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9' }]} />
 
             <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+              <Text style={[styles.detailLabel, { color: '#000000' }]}>
                 ⚡ Engine Status
               </Text>
-              <Text style={[styles.detailValue, { color: '#38bdf8' }]}>
+              <Text style={[styles.detailValue, { color: '#2C5EAD' }]}>
                 Valhalla + ONNX Dead Reckoning
               </Text>
             </View>
@@ -182,15 +195,15 @@ export default function ProfileScreen() {
 
         {/* Horizontal Settings Button */}
         <View style={styles.sectionWrapper}>
-          <Text style={[styles.sectionHeading, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+          <Text style={[styles.sectionHeading, { color: isDark ? SkyColors.sky400 : SkyColors.sky600 }]}>
             SYSTEM CONTROLS
           </Text>
           <TouchableOpacity
             style={[
               styles.horizontalSettingsBtn,
               {
-                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : '#ffffff',
-                borderColor: isDark ? 'rgba(56, 189, 248, 0.35)' : 'rgba(2, 132, 199, 0.3)',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
               },
             ]}
             onPress={handleOpenSettingsOnMap}
@@ -199,10 +212,10 @@ export default function ProfileScreen() {
               <Text style={{ fontSize: 20 }}>⚙️</Text>
             </View>
             <View style={styles.settingsBtnTextCol}>
-              <Text style={[styles.settingsBtnTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+              <Text style={[styles.settingsBtnTitle, { color: '#000000' }]}>
                 Map & System Settings
               </Text>
-              <Text style={[styles.settingsBtnSub, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+              <Text style={[styles.settingsBtnSub, { color: '#000000' }]}>
                 Offline tiles, cartography layers, road graph & voice guidance
               </Text>
             </View>
@@ -214,14 +227,14 @@ export default function ProfileScreen() {
 
         {/* Favourite Places Navigation */}
         <View style={styles.sectionWrapper}>
-          <Text style={[styles.sectionHeading, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+          <Text style={[styles.sectionHeading, { color: '#2C5EAD' }]}>
             SAVED PLACES
           </Text>
           <TouchableOpacity
             style={[
               styles.horizontalSettingsBtn,
               {
-                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : '#ffffff',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
                 borderColor: isDark ? 'rgba(234, 179, 8, 0.35)' : 'rgba(202, 138, 4, 0.3)',
               },
             ]}
@@ -231,10 +244,10 @@ export default function ProfileScreen() {
               <Text style={{ fontSize: 20 }}>⭐</Text>
             </View>
             <View style={styles.settingsBtnTextCol}>
-              <Text style={[styles.settingsBtnTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+              <Text style={[styles.settingsBtnTitle, { color: '#000000' }]}>
                 Favourite Places
               </Text>
-              <Text style={[styles.settingsBtnSub, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+              <Text style={[styles.settingsBtnSub, { color: '#000000' }]}>
                 View and manage saved destinations, home, work, and bookmarked pins
               </Text>
             </View>
@@ -246,70 +259,75 @@ export default function ProfileScreen() {
 
         {/* Feedback & Bug Reports Navigation */}
         <View style={styles.sectionWrapper}>
-          <Text style={[styles.sectionHeading, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+          <Text style={[styles.sectionHeading, { color: '#2C5EAD' }]}>
             HELP & COMMUNITY
           </Text>
           <TouchableOpacity
             style={[
               styles.horizontalSettingsBtn,
               {
-                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : '#ffffff',
-                borderColor: isDark ? 'rgba(245, 158, 11, 0.35)' : 'rgba(217, 119, 6, 0.3)',
+                backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                borderColor: isDark ? 'rgba(56, 189, 248, 0.35)' : 'rgba(2, 132, 199, 0.25)',
               },
             ]}
             onPress={() => router.push('/feedback')}
             activeOpacity={0.8}>
-            <View style={[styles.settingsBtnIconCircle, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
+            <View style={[styles.settingsBtnIconCircle, { backgroundColor: 'rgba(56, 189, 248, 0.18)' }]}>
               <Text style={{ fontSize: 20 }}>💬</Text>
             </View>
             <View style={styles.settingsBtnTextCol}>
-              <Text style={[styles.settingsBtnTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+              <Text style={[styles.settingsBtnTitle, { color: '#000000' }]}>
                 Feedback & Bug Reports
               </Text>
-              <Text style={[styles.settingsBtnSub, { color: isDark ? '#94a3b8' : '#64748b' }]}>
+              <Text style={[styles.settingsBtnSub, { color: '#000000' }]}>
                 Report issues, suggest features, and track your submitted feedback
               </Text>
             </View>
-            <View style={[styles.settingsBtnArrowBadge, { backgroundColor: 'rgba(245, 158, 11, 0.18)' }]}>
-              <Text style={[styles.settingsBtnArrowText, { color: '#f59e0b' }]}>Open →</Text>
+            <View style={[styles.settingsBtnArrowBadge, { backgroundColor: 'rgba(56, 189, 248, 0.2)' }]}>
+              <Text style={[styles.settingsBtnArrowText, { color: SkyColors.sky400 }]}>Open →</Text>
             </View>
           </TouchableOpacity>
         </View>
 
         {/* Account Authentication Actions */}
         <View style={styles.sectionWrapper}>
-          <Text style={[styles.sectionHeading, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+          <Text style={[styles.sectionHeading, { color: '#2C5EAD' }]}>
             SESSION ACTIONS
           </Text>
 
           {isGuest ? (
             <View style={{ gap: 12 }}>
               <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: '#0284c7' }]}
                 onPress={() => router.push('/signup')}
-                activeOpacity={0.85}>
-                <Text style={styles.actionBtnText}>🚀 Sign Up for Full Account</Text>
+                activeOpacity={0.85}
+                style={{ borderRadius: 16, overflow: 'hidden' }}>
+                <LinearGradient
+                  colors={SkyGradients.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.actionBtn}>
+                  <Text style={styles.actionBtnText}>🚀 Sign Up for Full Account</Text>
+                </LinearGradient>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  {
-                    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.8)' : '#e2e8f0',
-                    borderWidth: 1,
-                    borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
-                  },
-                ]}
                 onPress={() => router.push('/login')}
-                activeOpacity={0.85}>
-                <Text style={[styles.actionBtnText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
-                  🔑 Log In to Existing Account
-                </Text>
+                activeOpacity={0.85}
+                style={{ borderRadius: 16, overflow: 'hidden' }}>
+                <LinearGradient
+                  colors={SkyGradients.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.actionBtn}>
+                  <Text style={styles.actionBtnText}>
+                    🔑 Log In to Existing Account
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           ) : (
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}
+              style={[styles.actionBtn, { backgroundColor: '#E45742' }]}
               onPress={() => {
                 logout();
                 router.replace('/');
@@ -397,6 +415,27 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 8,
     marginBottom: 24,
+  },
+  avatarWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    overflow: 'hidden',
+    marginBottom: 14,
+    shadowColor: '#0284c7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 6,
+    borderWidth: 2.5,
+    borderColor: '#38bdf8',
+  },
+  avatarLargeGradient: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 40,
   },
   avatarLarge: {
     width: 80,
@@ -486,17 +525,17 @@ const styles = StyleSheet.create({
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#0284c7',
+    shadowColor: '#2C5EAD',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 10,
-    elevation: 6,
+    elevation: 4,
   },
   settingsBtnIconCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    backgroundColor: 'rgba(44, 94, 173, 0.10)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -514,14 +553,14 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   settingsBtnArrowBadge: {
-    backgroundColor: 'rgba(2, 132, 199, 0.2)',
+    backgroundColor: 'rgba(44, 94, 173, 0.12)',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 12,
     marginLeft: 8,
   },
   settingsBtnArrowText: {
-    color: '#38bdf8',
+    color: '#2C5EAD',
     fontSize: 12,
     fontWeight: '800',
   },

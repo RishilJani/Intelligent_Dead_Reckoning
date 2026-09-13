@@ -12,6 +12,8 @@ import {
   Platform,
 } from 'react-native';
 import { MapTileLayerType } from '@/types/navigation';
+import { LinearGradient } from '@/components/common/LinearGradient';
+import { SkyColors, SkyGradients } from '@/constants/theme';
 
 interface MapSettingsModalProps {
   visible: boolean;
@@ -97,34 +99,34 @@ export function MapSettingsModal({
               style={[
                 styles.modalCard,
                 {
-                  backgroundColor: isDark ? 'rgba(15, 23, 42, 0.98)' : 'rgba(255, 255, 255, 0.98)',
-                  borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
+                  backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+                  borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
                 },
               ]}>
               <View style={styles.headerRow}>
-                <Text style={[styles.headerTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                <Text style={[styles.headerTitle, { color: '#000000' }]}>
                   Map & System Settings
                 </Text>
                 <TouchableOpacity
                   style={[
                     styles.closeBtn,
-                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9' },
+                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : SkyColors.sky50 },
                   ]}
                   onPress={onClose}>
-                  <Text style={{ fontSize: 13, color: isDark ? '#94a3b8' : '#64748b' }}>✕</Text>
+                  <Text style={{ fontSize: 13, color: '#000000' }}>✕</Text>
                 </TouchableOpacity>
               </View>
 
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
                 {/* User Account / Guest Status Card */}
-                <Text style={[styles.sectionTitle, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+                <Text style={[styles.sectionTitle, { color: '#000000' }]}>
                   ACCOUNT & SESSION
                 </Text>
                 <View
                   style={[
                     styles.offlineCard,
                     {
-                      backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+                      backgroundColor: isDark ? SkyColors.skySurfaceDark : SkyColors.sky50,
                       marginBottom: 16,
                       borderWidth: 1,
                       borderColor: isGuest ? 'rgba(234, 179, 8, 0.3)' : 'rgba(16, 185, 129, 0.3)',
@@ -138,16 +140,22 @@ export function MapSettingsModal({
                           Guest Mode Active
                         </Text>
                       </View>
-                      <Text style={{ fontSize: 11.5, color: '#94a3b8', marginBottom: 12 }}>
+                      <Text style={{ fontSize: 11.5, color: '#1f2937', marginBottom: 12 }}>
                         Search and directions are locked. Sign up or log in to unlock full navigation.
                       </Text>
                       <TouchableOpacity
-                        style={[styles.offlineBtn, { backgroundColor: '#0284c7' }]}
+                        style={{ borderRadius: 8, overflow: 'hidden' }}
                         onPress={() => {
                           onClose();
                           onRequireAuth?.();
                         }}>
-                        <Text style={styles.offlineBtnText}>🚀 Sign Up / Log In Now</Text>
+                        <LinearGradient
+                          colors={SkyGradients.primary}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.offlineBtn}>
+                          <Text style={styles.offlineBtnText}>🚀 Sign Up / Log In Now</Text>
+                        </LinearGradient>
                       </TouchableOpacity>
                     </View>
                   ) : (
@@ -158,7 +166,7 @@ export function MapSettingsModal({
                           Logged In as {userName || 'User'}
                         </Text>
                       </View>
-                      <Text style={{ fontSize: 11.5, color: '#94a3b8', marginBottom: 12 }}>
+                      <Text style={{ fontSize: 11.5, color: '#1f2937', marginBottom: 12 }}>
                         {userEmail || 'Authenticated Session'} • Full Navigation Active
                       </Text>
                       <TouchableOpacity
@@ -174,18 +182,18 @@ export function MapSettingsModal({
                 </View>
 
                 {/* Offline Storage Section */}
-                <Text style={[styles.sectionTitle, { color: isDark ? '#38bdf8' : '#0284c7' }]}>
+                <Text style={[styles.sectionTitle, { color: '#000000' }]}>
                   OFFLINE MAP TILES (ANDROID APP & WEB)
                 </Text>
                 <View
                   style={[
                     styles.offlineCard,
-                    { backgroundColor: isDark ? '#1e293b' : '#f1f5f9' },
+                    { backgroundColor: isDark ? SkyColors.skySurfaceDark : SkyColors.sky50 },
                   ]}>
                   <Text
                     style={{
                       fontSize: 12,
-                      color: isDark ? '#cbd5e1' : '#334155',
+                      color: '#000000',
                       marginBottom: 8,
                     }}>
                     Stored in IndexedDB: <Text style={{ fontWeight: '800' }}>{offlineTileCount} tiles</Text> ({cacheSizeMb} MB)
@@ -198,12 +206,18 @@ export function MapSettingsModal({
                   )}
 
                   <TouchableOpacity
-                    style={[styles.offlineBtn, { backgroundColor: '#0284c7' }]}
+                    style={{ borderRadius: 8, overflow: 'hidden' }}
                     onPress={() => {
                       onDownloadArea();
                       onClose();
                     }}>
-                    <Text style={styles.offlineBtnText}>📥 Cache Current Area (Zooms 14-16)</Text>
+                    <LinearGradient
+                      colors={SkyGradients.primary}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.offlineBtn}>
+                      <Text style={styles.offlineBtnText}>📥 Cache Current Area (Zooms 14-16)</Text>
+                    </LinearGradient>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -220,10 +234,10 @@ export function MapSettingsModal({
                     {
                       backgroundColor: voiceGuidance
                         ? isDark
-                          ? 'rgba(2, 132, 199, 0.2)'
-                          : '#e0f2fe'
+                          ? 'rgba(56, 189, 248, 0.18)'
+                          : SkyColors.sky100
                         : isDark
-                        ? '#1e293b'
+                        ? SkyColors.skySurfaceDark
                         : '#f8fafc',
                     },
                   ]}
@@ -232,17 +246,17 @@ export function MapSettingsModal({
                     <Text
                       style={[
                         styles.settingLabel,
-                        { color: isDark ? '#f8fafc' : '#0f172a', fontWeight: '700' },
+                        { color: '#000000', fontWeight: '700' },
                       ]}>
                       🔊 Voice Guidance (TTS)
                     </Text>
-                    <Text style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 1 }}>
+                    <Text style={{ fontSize: 10.5, color: '#1f2937', marginTop: 1 }}>
                       Speaks arrival and live turn instructions
                     </Text>
                   </View>
                   <Text
                     style={{
-                      color: voiceGuidance ? '#0284c7' : '#94a3b8',
+                      color: voiceGuidance ? (isDark ? SkyColors.sky400 : SkyColors.sky600) : '#64748b',
                       fontWeight: '800',
                       fontSize: 12,
                     }}>
@@ -260,7 +274,7 @@ export function MapSettingsModal({
                           ? 'rgba(234, 88, 12, 0.2)'
                           : '#ffedd5'
                         : isDark
-                        ? '#1e293b'
+                        ? SkyColors.skySurfaceDark
                         : '#f8fafc',
                       marginTop: 8,
                     },
@@ -271,23 +285,19 @@ export function MapSettingsModal({
                       style={[
                         styles.settingLabel,
                         {
-                          color: showValhallaTiles
-                            ? '#ea580c'
-                            : isDark
-                            ? '#f8fafc'
-                            : '#0f172a',
+                          color: '#000000',
                           fontWeight: '700',
                         },
                       ]}>
                       🗺️ Valhalla Road Graph Tiles
                     </Text>
-                    <Text style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 1 }}>
+                    <Text style={{ fontSize: 10.5, color: '#1f2937', marginTop: 1 }}>
                       Level 0 (Highway), Level 1 (Arterial), Level 2 (Local)
                     </Text>
                   </View>
                   <Text
                     style={{
-                      color: showValhallaTiles ? '#ea580c' : '#94a3b8',
+                      color: showValhallaTiles ? '#ea580c' : '#64748b',
                       fontWeight: '800',
                       fontSize: 12,
                     }}>
@@ -299,7 +309,7 @@ export function MapSettingsModal({
                 <Text
                   style={[
                     styles.sectionTitle,
-                    { color: isDark ? '#94a3b8' : '#64748b', marginTop: 14 },
+                    { color: '#000000', marginTop: 14 },
                   ]}>
                   MAP CARTOGRAPHY STYLES
                 </Text>
@@ -313,10 +323,10 @@ export function MapSettingsModal({
                         {
                           backgroundColor: isSelected
                             ? isDark
-                              ? 'rgba(2, 132, 199, 0.2)'
-                              : '#e0f2fe'
+                              ? 'rgba(56, 189, 248, 0.18)'
+                              : SkyColors.sky100
                             : isDark
-                            ? '#1e293b'
+                            ? SkyColors.skySurfaceDark
                             : '#f8fafc',
                           marginBottom: 6,
                         },
@@ -327,22 +337,18 @@ export function MapSettingsModal({
                           style={[
                             styles.settingLabel,
                             {
-                              color: isSelected
-                                ? '#0284c7'
-                                : isDark
-                                ? '#f8fafc'
-                                : '#0f172a',
+                              color: '#000000',
                               fontWeight: isSelected ? '700' : '500',
                             },
                           ]}>
                           {layer.label}
                         </Text>
-                        <Text style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 1 }}>
+                        <Text style={{ fontSize: 10.5, color: '#1f2937', marginTop: 1 }}>
                           {layer.desc}
                         </Text>
                       </View>
                       {isSelected && (
-                        <Text style={{ color: '#0284c7', fontWeight: '900', fontSize: 14 }}>
+                        <Text style={{ color: isDark ? SkyColors.sky400 : SkyColors.sky600, fontWeight: '900', fontSize: 14 }}>
                           ✓
                         </Text>
                       )}

@@ -83,11 +83,11 @@ DisplayMap.displayName = 'DisplayMap';
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#090d16',
+    backgroundColor: '#ffffff',
     zIndex: 0,
   },
   webView: {
     flex: 1,
-    backgroundColor: '#090d16',
+    backgroundColor: '#ffffff',
   },
 });
