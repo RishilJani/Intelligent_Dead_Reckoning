@@ -1,7 +1,0 @@
-{
-  "model_version": "best_speed_model",
-  "calibration_a": 1.3510094952209877,
-  "calibration_b": -20.775073404681777,
-  "min_speed_kmh": 0.0,
-  "max_speed_kmh": 160.0
-}
