@@ -1,128 +1,84 @@
-const supabase = require('../supabase');
-const {
-  FAVOURITES_TBL,
-  FAV_ID,
-  FAV_NAME,
-  LATITUDE,
-  LONGITUDE,
-  USER_ID,
-  USERS_TBL,
-  USER_NAME,
-  EMAIL
-} = require('../stringConstants');
+const { FAVOURITES_TBL, USER_ID, FAV_ID } = require("../stringConstants");
+const supabase = require("../supabase");
 
-// Get all favourites
-async function getAllFavourites(req, res) {
-  try {
-    const { data, error } = await supabase.from(FAVOURITES_TBL).select('*');
-    if (error) {
-      return res.status(500).json({ message: error.message });
+// get all favourite places
+async function getAllFavPlaces(req, res) {
+    try {
+        const { data, error } = await supabase.from(FAVOURITES_TBL).select("*");
+        if (error) {
+            return res.status(500).json({ message: error.message });
+        }
+        return res.status(200).json(data);
+    } catch (err) {
+        console.error('err = ', err);
+        res.status(500).json({ message: err.message });
     }
-    return res.status(200).json(data || []);
-  } catch (err) {
-    console.error('err = ', err);
-    res.status(500).json({ message: err.message });
-  }
 }
 
-// Get favourites by user_id
-// Route: GET /favourites/:user_id
-async function getFavouritesByUserId(req, res) {
-  const { user_id } = req.params;
-  if (!user_id || isNaN(user_id)) {
-    return res.status(400).json({ message: 'User ID is not valid' });
-  }
-  try {
-    const { data, error } = await supabase
-      .from(FAVOURITES_TBL)
-      .select('*')
-      .eq(USER_ID, Number(user_id))
-      .order(FAV_ID, { ascending: false });
-
-    if (error) {
-      console.error('error = ', error);
-      return res.status(500).json({ message: error.message });
+// get all favourites places of user
+async function getAllFavPlacesByUserId(req, res) {
+    const { user_id } = req.params;
+    if (isNaN(user_id)) {
+        return res.status(400).json({ message: "User Id is not valid" });
     }
-    return res.status(200).json(data || []);
-  } catch (err) {
-    console.error('err = ', err);
-    res.status(500).json({ message: err.message });
-  }
+    try {
+        const { data, error } = await supabase.from(FAVOURITES_TBL).select("*").eq(USER_ID, user_id);
+        if (error) {
+            console.error("error  ", error);
+            return res.status(404).json({ message: error.message });
+        }
+        if (data.length > 0) {
+            return res.status(200).json(data);
+        } else {
+            return res.status.json({ message: "No Record Found" });
+        }
+    } catch (err) {
+        console.error('err = ', err);
+        res.status(500).json({ message: err.message });
+    }
 }
 
-// Add favourite place
-// Route: POST /favourites/
-// Expects: user_id, fav_name, latitude, longitude
-async function addFavourite(req, res) {
-  const user_id = req.body.user_id || req.user?.user_id;
-  const { fav_name, latitude, longitude } = req.body;
-
-  if (!user_id || !fav_name || latitude == null || longitude == null) {
-    return res.status(400).json({
-      message: 'user_id, fav_name, latitude, and longitude are required'
-    });
-  }
-
-  try {
-    const insertPayload = {
-      user_id: Number(user_id),
-      fav_name: String(fav_name).trim(),
-      latitude: String(latitude),
-      longitude: String(longitude)
-    };
-
-    const { data, error } = await supabase
-      .from(FAVOURITES_TBL)
-      .insert(insertPayload)
-      .select('*');
-
-    if (error) {
-      console.error('error = ', error.message);
-      return res.status(500).json({ message: error.message });
+// add favourite place of user
+async function addFavouritePlace(req, res) {
+    const { user_id, fav_name, latitude, longitude } = req.body;
+    if (!user_id || !fav_name || !latitude || !longitude) {
+        return res.status(400).json({
+            message: "User id, Favourite name, Latitude and longitude is mandatory"
+        });
+    }
+    try {
+        const { data, error } = await supabase.from(FAVOURITES_TBL).insert({
+            user_id, fav_name, latitude, longitude
+        }).select("*");
+        if (error) {
+            console.error("error = ", error.message);
+            return res.status(500).json({ message: error.message });
+        }
+        res.status(200).json(data);
+    } catch (err) {
+        console.error('err = ', err);
+        res.status(500).json({ message: err.message });
     }
 
-    const created = data && data.length > 0 ? data[0] : insertPayload;
-    return res.status(201).json(created);
-  } catch (err) {
-    console.error('err = ', err);
-    res.status(500).json({ message: err.message });
-  }
 }
 
-// Delete favourite place
-// Route: DELETE /favourites/:fav_id
-async function deleteFavourite(req, res) {
-  const { fav_id } = req.params;
-  if (!fav_id || isNaN(fav_id)) {
-    return res.status(400).json({ message: 'Favourite ID is not valid' });
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from(FAVOURITES_TBL)
-      .delete()
-      .eq(FAV_ID, Number(fav_id))
-      .select('*');
-
-    if (error) {
-      console.error('error = ', error.message);
-      return res.status(500).json({ message: error.message });
+// remove favourite place of user
+async function deleteFavouritePlace(req, res) {
+    const { fav_id } = req.params;
+    if (!fav_id || isNaN(fav_id)) {
+        return res.status(400).json({ message: "Favourite id is not valid" });
     }
-
-    if (data && data.length > 0) {
-      return res.status(200).json({ success: true, message: 'Favourite deleted', data: data[0] });
-    } else {
-      return res.status(200).json({ success: true, message: 'Favourite deleted' });
+    try {
+        const { data, error } = await supabase.from(FAVOURITES_TBL).delete().eq(FAV_ID, Number(fav_id));
+        if (error) {
+            console.error("error = ", error.message);
+            return res.status(500).json({ success: false, message: error.message });
+        }
+        return res.status(200).json({ success: true, fav_id });
+    } catch (err) {
+        console.error('err = ', err);
+        res.status(500).json({ message: err.message });
     }
-  } catch (err) {
-    console.error('err = ', err);
-    res.status(500).json({ message: err.message });
-  }
 }
 
-module.exports = {
-  getAllFavourites,
-  getFavouritesByUserId,
-  addFavourite,
-  deleteFavourite
-};
+module.exports = { getAllFavPlaces, getAllFavPlacesByUserId, addFavouritePlace , deleteFavouritePlace };

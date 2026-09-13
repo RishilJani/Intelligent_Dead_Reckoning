@@ -43,7 +43,12 @@ async function getFeedbacksByUserId(req, res) {
 
         if (error) {
             console.error("error  ", error);
-            return res.status(500).json({ message: error.message });
+            return res.status(404).json({ message: error.message });
+        }
+        if (data.length > 0) {
+            return res.status(200).json(data);
+        } else {
+            return res.status(404).json({ message: "No Record Found" });
         }
         return res.status(200).json(data || []);
     } catch (err) {
@@ -114,8 +119,8 @@ async function updateFeedback(req, res) {
         if (is_bug !== undefined) updatePayload.is_bug = is_bug;
 
         const { data, error } = await supabase.from(FEEDBACKS_TBL).update(
-            updatePayload
-        ).eq(FEEDBACK_ID, feedback_id).select(SELECT_QUERY);
+            { feedback_text, is_bug, updated_at }
+        ).eq(FEEDBACK_ID, feedback_id).select();
 
         if (error) {
             console.error("error = ", error);

@@ -1,24 +1,13 @@
-const {
-  getAllFavourites,
-  getFavouritesByUserId,
-  addFavourite,
-  deleteFavourite
-} = require('../services/favouriteService');
-const router = require('express').Router();
+const { getAllFavPlaces, getAllFavPlacesByUserId, addFavouritePlace,deleteFavouritePlace} = require("../services/favouriteService");
 
-// Get all favourites
-router.get('/', getAllFavourites);
+const router = require("express").Router();
 
-// Get by user_id
-// Route: GET /favourites/:user_id
-router.get('/:user_id', getFavouritesByUserId);
+router.get("/", getAllFavPlaces);
 
-// Add favourite
-// Route: POST /favourites/
-router.post('/', addFavourite);
+router.get("/:user_id", getAllFavPlacesByUserId);
 
-// Delete favourite
-// Route: DELETE /favourites/:fav_id
-router.delete('/:fav_id', deleteFavourite);
+router.post("/", addFavouritePlace);
+
+router.delete("/:fav_id", deleteFavouritePlace);
 
 module.exports = router;

@@ -20,11 +20,11 @@ const IS_SOLVED = "is_solved";
 const FAV_ID = "fav_id";
 const FAV_NAME = "fav_name";
 const LATITUDE = "latitude";
-const LONGITUDE = "longitude";
+const LONGITUDE = "longitude"
 
 module.exports = {
     USERS_TBL, FEEDBACKS_TBL, FAVOURITES_TBL,
     USER_ID, USER_NAME, PASSWORD_HASH, EMAIL, PHONE, CREATED_AT, UPDATED_AT,
-    FEEDBACK_ID, FEEDBACK_TEXT , IS_BUG , IS_SOLVED,
-    FAV_ID, FAV_NAME, LATITUDE, LONGITUDE
+    FEEDBACK_ID, FEEDBACK_TEXT, IS_BUG, IS_SOLVED,
+    FAV_ID, LATITUDE, LONGITUDE, FAV_NAME
 }

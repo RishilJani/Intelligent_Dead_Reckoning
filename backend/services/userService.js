@@ -44,17 +44,18 @@ async function getByUserId(req, res) {
 // add user
 async function addUser(req, res) {
     const { user_name, phone, email, password } = req.body;
-    if (!user_name || !phone || !email || !password) {
+    if (!user_name || !email || !password) {
         return res.status(400).json({
-            message: "User Name, phone , email ,password is mandatory"
+            message: "User Name, email, and password are required"
         });
     }
+    const userPhone = phone || '';
     const created_at = new Date();
     try {
         const salt = process.env.SALT || 10;
         const password_hash = await bcrypt.hash(password, salt);
         const { data, error } = await supabase.from(USERS_TBL).insert({
-            user_name, phone, email, password_hash, created_at
+            user_name, phone: userPhone, email, password_hash, created_at
         }).select(`${USER_ID},${USER_NAME},${EMAIL},${PHONE},${CREATED_AT},${UPDATED_AT}`);
 
         if (error) {
