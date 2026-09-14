@@ -74,18 +74,18 @@ The mobile application is built using **React Native Expo**.
 ### Frontend Structure
 
 ```text
-mobile/
+Frontend
 ├── assets/
-├── components/
-├── screens/
-├── navigation/
-├── services/
-├── sensors/
-├── maps/
-├── utils/
-├── models/
-├── App.js
-└── package.json
+├── scripts/
+├── sihapp/
+├── src/
+├── best_speed_model2.pt
+├── eas.json
+├── expo-env.d.ts
+├── gitignore
+├── package.json
+├── tsconfig.json
+└── walking_speed_model.pt
 ```
 
 ---
