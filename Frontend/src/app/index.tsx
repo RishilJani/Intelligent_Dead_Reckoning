@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, useColorScheme } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DisplayMap, DisplayMapHandle } from '@/components/displaymap/DisplayMap';
 import { MapControls } from '@/components/displaymap/MapControls';
@@ -21,10 +21,16 @@ import {
   MapTileLayerType,
   RouteStatistics,
 } from '@/types/navigation';
+import { SkyColors, SkyGradients } from '@/constants/theme';
 
 export default function NavigationScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ openSettings?: string }>();
+  const params = useLocalSearchParams<{
+    openSettings?: string;
+    destLat?: string;
+    destLon?: string;
+    destName?: string;
+  }>();
   const { user, isGuest, logout } = useAuth();
 
   const colorScheme = useColorScheme();
@@ -54,6 +60,17 @@ export default function NavigationScreen() {
   const [predictedYawRate, setPredictedYawRate] = useState<number>(0);
   const [gpsAvailable, setGpsAvailable] = useState<boolean>(true);
   const [sensorTelemetry, setSensorTelemetry] = useState<LiveSensorTelemetry | null>(null);
+  const [rawModelSpeedKmh, setRawModelSpeedKmh] = useState<number>(0);
+  const [confirmedSpeedKmh, setConfirmedSpeedKmh] = useState<number>(0);
+  const [modelConfidence, setModelConfidence] = useState<number>(100);
+  const [activeBarriers, setActiveBarriers] = useState<string[]>([]);
+
+  // Refs to preserve latest destination & costing for deferred route calculation on GPS fix
+  const endPointRef = useRef<LocationPoint | null>(null);
+  const activeCostingRef = useRef<CostingMode>('auto');
+  const hasInitialRoutedRef = useRef<boolean>(false);
+  const routeLoadingTimeoutRef = useRef<any>(null);
+  const lastProcessedDestRef = useRef<string>('');
 
   // Live Location Tracker Hook with continuous GPS streaming
   const {
@@ -75,11 +92,17 @@ export default function NavigationScreen() {
         speedKmh: coords.speedKmh,
         setAsStart: true,
       });
-      deadReckoning.updateGpsPosition(coords.lat, coords.lon, coords.heading || 0, coords.speedKmh || 0);
+      deadReckoning.updateGpsPosition(coords.lat, coords.lon, coords.heading || 0, coords.speedKmh || 0, coords.accuracy || 8);
+
+      // If an endPoint was set from favourites before GPS was ready, calculate route ONCE
+      if (endPointRef.current && !hasInitialRoutedRef.current) {
+        hasInitialRoutedRef.current = true;
+        updateRoute(initialStart, endPointRef.current, activeCostingRef.current);
+      }
     }, [sendMapCommand, deadReckoning]),
     onLocationUpdate: useCallback((coords: LiveCoords) => {
       // Feed GPS reading into Dead Reckoning Engine
-      deadReckoning.updateGpsPosition(coords.lat, coords.lon, coords.heading || 0, coords.speedKmh || 0);
+      deadReckoning.updateGpsPosition(coords.lat, coords.lon, coords.heading || 0, coords.speedKmh || 0, coords.accuracy || 8);
 
       // Feed GPS vehicle dynamics to SensorPipeline
       SensorPipeline.getInstance().feedGpsKinematics(coords.speedKmh || 0, coords.heading || 0);
@@ -98,6 +121,10 @@ export default function NavigationScreen() {
 
   // Route Points & States
   const [endPoint, setEndPoint] = useState<LocationPoint | null>(null);
+  useEffect(() => {
+    endPointRef.current = endPoint;
+  }, [endPoint]);
+
   const [selectedPlace, setSelectedPlace] = useState<LocationPoint | null>(null);
   const [isPreviewingDirections, setIsPreviewingDirections] = useState<boolean>(false);
   const [mapClickTarget, setMapClickTarget] = useState<'start' | 'end'>('end');
@@ -115,9 +142,9 @@ export default function NavigationScreen() {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((userLat * Math.PI) / 180) *
-        Math.cos((selectedPlace.lat * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos((selectedPlace.lat * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const meters = R * c;
     if (meters < 1000) {
@@ -182,6 +209,53 @@ export default function NavigationScreen() {
     });
   };
 
+  useEffect(() => {
+    activeCostingRef.current = activeCosting;
+  }, [activeCosting]);
+
+  // Handle incoming destination parameters from favourites screen
+  useEffect(() => {
+    if (!params?.destLat || !params?.destLon) return;
+
+    const destKey = `${params.destLat}_${params.destLon}_${params.destName || ''}`;
+    if (lastProcessedDestRef.current === destKey) {
+      return; // Already processed this destination query, prevent infinite loop!
+    }
+    lastProcessedDestRef.current = destKey;
+
+    const lat = parseFloat(params.destLat);
+    const lon = parseFloat(params.destLon);
+    if (isNaN(lat) || isNaN(lon)) return;
+
+    const destPoint: LocationPoint = {
+      lat,
+      lon,
+      name: params.destName || 'Favourite Place',
+    };
+    setSelectedPlace(destPoint);
+    setEndPoint(destPoint);
+    setIsPreviewingDirections(true);
+    sendMapCommand('PAN_TO_POINT', { lat, lon, zoom: 16 });
+
+    // Resolve current start point: prefer verified liveCoords or cached startPoint (avoid default Delhi)
+    const isDelhiPlaceholder = (p: { lat: number; lon: number } | null) =>
+      !p || (Math.abs(p.lat - 28.6139) < 0.001 && Math.abs(p.lon - 77.2090) < 0.001);
+
+    if (liveCoords && !isDelhiPlaceholder(liveCoords)) {
+      const activeStart: LocationPoint = {
+        lat: liveCoords.lat,
+        lon: liveCoords.lon,
+        name: '📍 Current Location',
+        isLiveLocation: true,
+      };
+      hasInitialRoutedRef.current = true;
+      updateRoute(activeStart, destPoint, activeCosting);
+    } else if (startPoint && !startPoint.isDefaultPlaceholder && !isDelhiPlaceholder(startPoint)) {
+      hasInitialRoutedRef.current = true;
+      updateRoute(startPoint, destPoint, activeCosting);
+    }
+  }, [params?.destLat, params?.destLon, params?.destName]);
+
   // Handle map incoming messages
   const handleMapMessage = useCallback(
     (eventData: any) => {
@@ -205,6 +279,9 @@ export default function NavigationScreen() {
         }
 
         if (data.type === 'ROUTE_UPDATED') {
+          if (routeLoadingTimeoutRef.current) {
+            clearTimeout(routeLoadingTimeoutRef.current);
+          }
           setRouteStats({
             distanceKm: Number(data.distanceKm || 0),
             durationMins: Number(data.durationMins || 0),
@@ -212,14 +289,18 @@ export default function NavigationScreen() {
             summary: data.summary || 'Route Calculated',
             engineMode: data.engineMode || 'Valhalla Online',
           });
-          if (data.startPoint) setStartPoint(data.startPoint);
-          if (data.endPoint) setEndPoint(data.endPoint);
           if (data.coords && Array.isArray(data.coords)) {
             deadReckoning.setActiveRoute(data.coords);
           }
           setIsLoadingRoute(false);
         } else if (data.type === 'ROUTE_LOADING') {
           setIsLoadingRoute(true);
+          if (routeLoadingTimeoutRef.current) {
+            clearTimeout(routeLoadingTimeoutRef.current);
+          }
+          routeLoadingTimeoutRef.current = setTimeout(() => {
+            setIsLoadingRoute(false);
+          }, 8000);
         } else if (data.type === 'NAV_COMPLETED') {
           setIsNavigating(false);
           setIsPreviewingDirections(false);
@@ -401,6 +482,7 @@ export default function NavigationScreen() {
   // User selects travel mode (car, bike, pedestrian) on directions preview
   const handleSelectCosting = (mode: CostingMode) => {
     setActiveCosting(mode);
+    deadReckoning.setCostingMode(mode);
     sendMapCommand('SET_COSTING', { costing: mode });
     const target = selectedPlace || endPoint;
     if (startPoint && target) {
@@ -419,6 +501,7 @@ export default function NavigationScreen() {
   // Travel Mode Selection
   const handleSelectTravelMode = (mode: CostingMode) => {
     setActiveCosting(mode);
+    deadReckoning.setCostingMode(mode);
     sendMapCommand('SET_COSTING', { costing: mode });
   };
 
@@ -433,6 +516,7 @@ export default function NavigationScreen() {
 
     if (nextNav) {
       setIsPreviewingDirections(false);
+      deadReckoning.setCostingMode(activeCosting);
       // Immediately prime Dead Reckoning with the latest GPS coordinate so it starts in GPS mode
       if (liveCoords) {
         deadReckoning.updateGpsPosition(
@@ -443,12 +527,16 @@ export default function NavigationScreen() {
         );
       }
 
-      // Start Dead Reckoning Engine (GPS online -> GPS; GPS offline -> ONNX model)
+      // Start Dead Reckoning Engine (GPS online -> GPS; GPS offline -> TF Speed Model + Barriers)
       deadReckoning.start((state: DeadReckoningState) => {
         setNavMode(state.mode);
         setCurrentSpeedKmh(Math.round(state.speedKmh));
         setPredictedYawRate(state.yawRateDps);
         setGpsAvailable(state.gpsAvailable);
+        if (state.rawModelSpeedKmh != null) setRawModelSpeedKmh(state.rawModelSpeedKmh);
+        if (state.confirmedSpeedKmh != null) setConfirmedSpeedKmh(state.confirmedSpeedKmh);
+        if (state.modelConfidence != null) setModelConfidence(state.modelConfidence);
+        if (state.activeBarriers) setActiveBarriers(state.activeBarriers);
         if (state.telemetry) {
           setSensorTelemetry(state.telemetry);
         }
@@ -471,12 +559,23 @@ export default function NavigationScreen() {
     } else {
       deadReckoning.stop();
       setSensorTelemetry(null);
+      setActiveBarriers([]);
+      setRawModelSpeedKmh(0);
+      setConfirmedSpeedKmh(0);
+      setModelConfidence(100);
       sendMapCommand('TOGGLE_REAL_NAVIGATION', {
         active: false,
       });
       setIsPreviewingDirections(false);
     }
   };
+
+  // Tunnel / GPS Blackout Simulation Toggle for HUD
+  const handleToggleTunnel = useCallback(() => {
+    const nextVal = deadReckoning.toggleTunnelMode();
+    setIsOfflineMode(nextVal);
+    sendMapCommand('SET_FORCE_OFFLINE', { offline: nextVal });
+  }, [deadReckoning, sendMapCommand]);
 
   // Cartography & Tile Settings
   const handleSelectLayer = (layer: MapTileLayerType) => {
@@ -505,7 +604,7 @@ export default function NavigationScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#090d16' : '#f8fafc' }]}>
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.container, { backgroundColor: '#ffffff', paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       {/* 1. Full Screen Interactive Map with Base64 IndexedDB Tile Caching */}
       <DisplayMap ref={mapRef} onMapMessage={handleMapMessage} />
 
@@ -531,16 +630,34 @@ export default function NavigationScreen() {
 
       {/* 4. Startup GPS Locating / Route Calculating Status Overlays */}
       {isLocatingOnStartup && (
-        <View style={[styles.statusBanner, { top: Math.max(insets.top + 72, 80) }]}>
-          <ActivityIndicator size="small" color="#38bdf8" />
-          <Text style={styles.statusBannerText}>Acquiring Live GPS Location...</Text>
+        <View
+          style={[
+            styles.statusBanner,
+            {
+              top: Math.max(insets.top + 72, 80),
+              backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+              borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
+            },
+          ]}>
+          <ActivityIndicator size="small" color={SkyColors.sky400} />
+          <Text style={[styles.statusBannerText, { color: '#000000' }]}>
+            Acquiring Live GPS Location...
+          </Text>
         </View>
       )}
 
       {isLoadingRoute && !isLocatingOnStartup && (
-        <View style={[styles.statusBanner, { top: Math.max(insets.top + 72, 80) }]}>
-          <ActivityIndicator size="small" color="#38bdf8" />
-          <Text style={styles.statusBannerText}>
+        <View
+          style={[
+            styles.statusBanner,
+            {
+              top: Math.max(insets.top + 72, 80),
+              backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff',
+              borderColor: isDark ? SkyColors.skyBorderDark : SkyColors.skyBorderLight,
+            },
+          ]}>
+          <ActivityIndicator size="small" color={SkyColors.sky400} />
+          <Text style={[styles.statusBannerText, { color: '#000000' }]}>
             {isOfflineMode ? 'Solving Offline Route...' : 'Calculating Valhalla Route...'}
           </Text>
         </View>
@@ -548,15 +665,15 @@ export default function NavigationScreen() {
 
       {/* 6. Offline Download Progress Banner */}
       {isDownloadingOffline && (
-        <View style={[styles.statusBanner, { bottom: 120, borderColor: '#f59e0b' }]}>
+        <View style={[styles.statusBanner, { bottom: 120, borderColor: '#f59e0b', backgroundColor: isDark ? SkyColors.skyCardDark : '#ffffff' }]}>
           <ActivityIndicator size="small" color="#f59e0b" />
-          <Text style={styles.statusBannerText}>
+          <Text style={[styles.statusBannerText, { color: '#000000' }]}>
             Downloading Offline Map Tiles... {downloadProgress}%
           </Text>
         </View>
       )}
 
-      {/* 7. Bottom Navigation & Route Summary Card with On-Device ONNX ML Dead Reckoning */}
+      {/* 7. Bottom Navigation & Route Summary Card with On-Device ML Dead Reckoning & Barrier HUD */}
       <NavigationCard
         routeStats={routeStats}
         activeCosting={activeCosting}
@@ -566,6 +683,12 @@ export default function NavigationScreen() {
         gpsAvailable={gpsAvailable}
         yawRateDps={predictedYawRate}
         telemetry={sensorTelemetry}
+        rawModelSpeedKmh={rawModelSpeedKmh}
+        confirmedSpeedKmh={confirmedSpeedKmh}
+        modelConfidence={modelConfidence}
+        activeBarriers={activeBarriers}
+        isTunnelMode={isOfflineMode}
+        onToggleTunnelMode={handleToggleTunnel}
         selectedPlace={selectedPlace}
         distanceToSelectedPlace={distanceToSelectedPlace}
         isPreviewingDirections={isPreviewingDirections}
@@ -608,7 +731,7 @@ export default function NavigationScreen() {
         onDownloadArea={handleDownloadArea}
         onClearCache={handleClearCache}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -620,25 +743,22 @@ const styles = StyleSheet.create({
   statusBanner: {
     position: 'absolute',
     alignSelf: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.94)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+    borderRadius: 22,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
     zIndex: 999,
-    shadowColor: '#000',
+    shadowColor: '#2C5EAD',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
     elevation: 8,
   },
   statusBannerText: {
-    color: '#f8fafc',
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '700',
   },
 });

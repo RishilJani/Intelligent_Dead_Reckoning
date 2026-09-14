@@ -121,7 +121,7 @@ export function FloatingRoutePill({
               numberOfLines={1}
               style={[
                 styles.collapsedText,
-                { color: isDark ? '#f8fafc' : '#0f172a' },
+                { color: '#000000' },
               ]}>
               {destText || 'Search destination...'}
             </Text>
@@ -138,7 +138,7 @@ export function FloatingRoutePill({
                 style={[
                   styles.textInput,
                   {
-                    color: isDark ? '#f8fafc' : '#0f172a',
+                    color: '#000000',
                     backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : '#f1f5f9',
                   },
                 ]}
@@ -146,7 +146,7 @@ export function FloatingRoutePill({
                 onChangeText={handleOriginChange}
                 onFocus={() => setActiveField('start')}
                 placeholder="Start location (A)..."
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#64748b"
               />
               <TouchableOpacity
                 style={styles.swapBtn}
@@ -177,7 +177,7 @@ export function FloatingRoutePill({
                         numberOfLines={1}
                         style={[
                           styles.suggestionText,
-                          { color: isDark ? '#f8fafc' : '#0f172a' },
+                          { color: '#000000' },
                         ]}>
                         {item.display_name}
                       </Text>
@@ -196,7 +196,7 @@ export function FloatingRoutePill({
                 style={[
                   styles.textInput,
                   {
-                    color: isDark ? '#f8fafc' : '#0f172a',
+                    color: '#000000',
                     backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : '#f1f5f9',
                   },
                 ]}
@@ -204,7 +204,7 @@ export function FloatingRoutePill({
                 onChangeText={handleDestChange}
                 onFocus={() => setActiveField('end')}
                 placeholder="Where to? (Destination B)..."
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#64748b"
               />
               {/* Map Tap Selector Badge */}
               <TouchableOpacity
@@ -253,7 +253,7 @@ export function FloatingRoutePill({
                         numberOfLines={1}
                         style={[
                           styles.suggestionText,
-                          { color: isDark ? '#f8fafc' : '#0f172a' },
+                          { color: '#000000' },
                         ]}>
                         {item.display_name}
                       </Text>

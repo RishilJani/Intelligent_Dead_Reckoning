@@ -125,10 +125,12 @@ async function updateUser(req, res) {
 // login user
 async function login(req, res) {
     const { email, password } = req.body;
+    console.log("Login here 1....");
     if (!email || !password) {
         return res.status(400).json({ message: "Email and Password are required" });
     }
     try {
+        console.log("Login here 2....");
         const { data, error } = await supabase.from(USERS_TBL).select("*").eq(EMAIL, email);
         if (error) {
             console.error("error = ", error.message);

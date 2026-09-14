@@ -3,6 +3,7 @@ export interface LocationPoint {
   lon: number;
   name: string;
   isLiveLocation?: boolean;
+  isDefaultPlaceholder?: boolean;
 }
 
 export type CostingMode = 'auto' | 'bicycle' | 'pedestrian' | 'truck';

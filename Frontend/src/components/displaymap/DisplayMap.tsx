@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useEffect, useMemo, memo } from 'react';
 import { StyleSheet, View, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { getMapHtml } from './mapTemplate';
@@ -11,9 +11,9 @@ export interface DisplayMapProps {
   onMapMessage: (data: any) => void;
 }
 
-export const DisplayMap = forwardRef<DisplayMapHandle, DisplayMapProps>(({ onMapMessage }, ref) => {
+export const DisplayMap = memo(forwardRef<DisplayMapHandle, DisplayMapProps>(({ onMapMessage }, ref) => {
   const webViewRef = useRef<WebView | null>(null);
-  const mapHtml = getMapHtml();
+  const mapHtml = useMemo(() => getMapHtml(), []);
 
   useImperativeHandle(ref, () => ({
     sendCommand: (type: string, payload: any = {}) => {
@@ -76,18 +76,18 @@ export const DisplayMap = forwardRef<DisplayMapHandle, DisplayMapProps>(({ onMap
       )}
     </View>
   );
-});
+}));
 
 DisplayMap.displayName = 'DisplayMap';
 
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#090d16',
+    backgroundColor: '#ffffff',
     zIndex: 0,
   },
   webView: {
     flex: 1,
-    backgroundColor: '#090d16',
+    backgroundColor: '#ffffff',
   },
 });
