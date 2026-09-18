@@ -34,7 +34,7 @@ interface NavigationCardProps {
   activeBarriers?: string[];
   isTunnelMode?: boolean;
   onToggleTunnelMode?: () => void;
-  
+
   // Place Selection & Directions Preview
   selectedPlace?: LocationPoint | null;
   distanceToSelectedPlace?: string | null;
@@ -282,8 +282,8 @@ export function NavigationCard({
                     backgroundColor: favSuccess
                       ? 'rgba(234, 179, 8, 0.25)'
                       : isDark
-                      ? 'rgba(56, 189, 248, 0.12)'
-                      : SkyColors.sky100,
+                        ? 'rgba(56, 189, 248, 0.12)'
+                        : SkyColors.sky100,
                     borderColor: favSuccess ? '#eab308' : isDark ? 'rgba(56, 189, 248, 0.3)' : SkyColors.sky200,
                   },
                 ]}
@@ -415,8 +415,8 @@ export function NavigationCard({
                     backgroundColor: favSuccess
                       ? 'rgba(234, 179, 8, 0.25)'
                       : isDark
-                      ? 'rgba(56, 189, 248, 0.12)'
-                      : SkyColors.sky100,
+                        ? 'rgba(56, 189, 248, 0.12)'
+                        : SkyColors.sky100,
                     borderColor: favSuccess ? '#eab308' : isDark ? 'rgba(56, 189, 248, 0.3)' : SkyColors.sky200,
                   },
                 ]}
@@ -460,7 +460,7 @@ export function NavigationCard({
                       style={[
                         styles.modeTabPillInactive,
                         {
-                          backgroundColor: isDark ? 'rgba(18, 46, 77, 0.5)' : SkyColors.sky50,
+                          backgroundColor: isDark ? 'rgba(255, 255, 255, 1)' : SkyColors.sky50,
                           borderColor: isDark ? 'rgba(56, 189, 248, 0.2)' : SkyColors.sky200,
                         },
                       ]}>
@@ -468,7 +468,7 @@ export function NavigationCard({
                       <Text
                         style={[
                           styles.modeTabText,
-                          { color: isDark ? '#94a3b8' : '#475569' },
+                          { color: isDark ? '#94a3b8' : '#101d2eff' },
                         ]}>
                         {item.label}
                       </Text>
@@ -598,8 +598,8 @@ export function NavigationCard({
                     backgroundColor: isTunnelMode
                       ? '#f59e0b'
                       : navMode === 'TF_DEAD_RECKONING'
-                      ? '#a855f7'
-                      : '#10b981',
+                        ? '#a855f7'
+                        : '#10b981',
                   },
                 ]}
               />
@@ -611,15 +611,15 @@ export function NavigationCard({
                       color: isTunnelMode
                         ? '#f59e0b'
                         : navMode === 'TF_DEAD_RECKONING'
-                        ? '#c084fc'
-                        : '#10b981',
+                          ? '#c084fc'
+                          : '#10b981',
                     },
                   ]}>
                   {isTunnelMode
                     ? '🚇 Tunnel Mode (GPS Blackout)'
                     : navMode === 'TF_DEAD_RECKONING'
-                    ? '🤖 Neural Speed DR (Offline)'
-                    : '🛰️ Real GPS Connected'}
+                      ? '🤖 Neural Speed DR (Offline)'
+                      : '🛰️ Real GPS Connected'}
                 </Text>
                 {navMode === 'TF_DEAD_RECKONING' && (
                   <Text style={{ fontSize: 9, color: isDark ? '#94a3b8' : '#64748b', marginTop: 1 }}>
@@ -647,8 +647,8 @@ export function NavigationCard({
                   backgroundColor: isTunnelMode
                     ? '#f59e0b'
                     : navMode === 'TF_DEAD_RECKONING'
-                    ? '#a855f7'
-                    : '#0ea5e9',
+                      ? '#a855f7'
+                      : '#0ea5e9',
                 },
               ]}
             />
@@ -663,16 +663,16 @@ export function NavigationCard({
                 {
                   backgroundColor:
                     activeBarriers.includes('SPIKE_GUARD') ||
-                    activeBarriers.includes('SPIKE_REJECTED') ||
-                    telemetry?.isTwitchSpikeSuppressed
+                      activeBarriers.includes('SPIKE_REJECTED') ||
+                      telemetry?.isTwitchSpikeSuppressed
                       ? 'rgba(245, 158, 11, 0.18)'
                       : isDark
-                      ? 'rgba(30, 41, 59, 0.6)'
-                      : '#f1f5f9',
+                        ? 'rgba(30, 41, 59, 0.6)'
+                        : '#f1f5f9',
                   borderColor:
                     activeBarriers.includes('SPIKE_GUARD') ||
-                    activeBarriers.includes('SPIKE_REJECTED') ||
-                    telemetry?.isTwitchSpikeSuppressed
+                      activeBarriers.includes('SPIKE_REJECTED') ||
+                      telemetry?.isTwitchSpikeSuppressed
                       ? '#f59e0b'
                       : 'transparent',
                 },
@@ -683,18 +683,18 @@ export function NavigationCard({
                   {
                     color:
                       activeBarriers.includes('SPIKE_GUARD') ||
-                      activeBarriers.includes('SPIKE_REJECTED') ||
-                      telemetry?.isTwitchSpikeSuppressed
+                        activeBarriers.includes('SPIKE_REJECTED') ||
+                        telemetry?.isTwitchSpikeSuppressed
                         ? '#f59e0b'
                         : isDark
-                        ? '#94a3b8'
-                        : '#64748b',
+                          ? '#94a3b8'
+                          : '#64748b',
                   },
                 ]}>
                 🛡️{' '}
                 {activeBarriers.includes('SPIKE_GUARD') ||
-                activeBarriers.includes('SPIKE_REJECTED') ||
-                telemetry?.isTwitchSpikeSuppressed
+                  activeBarriers.includes('SPIKE_REJECTED') ||
+                  telemetry?.isTwitchSpikeSuppressed
                   ? 'Spike Guard'
                   : 'Spikes: OK'}
               </Text>
@@ -708,8 +708,8 @@ export function NavigationCard({
                   backgroundColor: activeBarriers.includes('KINEMATIC_GUARD')
                     ? 'rgba(168, 85, 247, 0.2)'
                     : isDark
-                    ? 'rgba(30, 41, 59, 0.6)'
-                    : '#f1f5f9',
+                      ? 'rgba(30, 41, 59, 0.6)'
+                      : '#f1f5f9',
                   borderColor: activeBarriers.includes('KINEMATIC_GUARD')
                     ? '#a855f7'
                     : 'transparent',
@@ -722,8 +722,8 @@ export function NavigationCard({
                     color: activeBarriers.includes('KINEMATIC_GUARD')
                       ? '#c084fc'
                       : isDark
-                      ? '#94a3b8'
-                      : '#64748b',
+                        ? '#94a3b8'
+                        : '#64748b',
                   },
                 ]}>
                 ⚡ {activeBarriers.includes('KINEMATIC_GUARD') ? 'G-Clamped' : 'G-Force: OK'}
@@ -739,8 +739,8 @@ export function NavigationCard({
                     activeBarriers.includes('ZUPT_LOCKED') || activeBarriers.includes('CRAWL_SNAP')
                       ? 'rgba(239, 68, 68, 0.18)'
                       : isDark
-                      ? 'rgba(30, 41, 59, 0.6)'
-                      : '#f1f5f9',
+                        ? 'rgba(30, 41, 59, 0.6)'
+                        : '#f1f5f9',
                   borderColor:
                     activeBarriers.includes('ZUPT_LOCKED') || activeBarriers.includes('CRAWL_SNAP')
                       ? '#ef4444'
@@ -813,8 +813,8 @@ export function NavigationCard({
                   backgroundColor: isTunnelMode
                     ? 'rgba(245, 158, 11, 0.16)'
                     : isDark
-                    ? 'rgba(30, 41, 59, 0.8)'
-                    : '#f8fafc',
+                      ? 'rgba(30, 41, 59, 0.8)'
+                      : '#f8fafc',
                   borderColor: isTunnelMode ? '#f59e0b' : isDark ? 'rgba(255,255,255,0.12)' : '#cbd5e1',
                 },
               ]}
